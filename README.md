@@ -10,6 +10,7 @@ Run `npm start`, then open `http://127.0.0.1:4178/`. Use arrows, WASD, touch swi
 - 12 rounds in four antes, four visible boss rules, three starting kits.
 - Standard, Easygoing and unlockable High Stakes modes; fixed daily seeds use UTC.
 - Device-local automatic saves, optional procedural sound, reduced motion, keyboard controls.
+- Juicy feedback: moving ghost tiles, new-tile drop-ins, merge pops, spark bursts, score floaters, board flashes, score-panel pulses, shop/dialog motion, and distinct move/merge/power/shop/win/loss tones. Sound is on for new players, remembers the user's choice, and has a volume slider in Pause.
 - Relic selection and tile generation use separate seeded random streams.
 
 ## Playtest logs
