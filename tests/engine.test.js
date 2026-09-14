@@ -32,6 +32,20 @@ test('all relics score safely in corner, crowded, sparse and large-tile configur
   const s=setup(b,{relics:[r.id],previous:'up',combo:4,moves:5});const score=E.scoreSlide(s,E.slide(b,'left'),'left');assert.ok(Number.isFinite(score.points)&&score.points>0, r.id);
  }
 });
+test('variance jokers are deterministic, readable and stay above zero',()=>{
+ const changes={relics:['jackpot','mystery','loaded','chaos'],chaosRoll:6,chaosFactor:2};
+ const a=setup(board(2,2),changes),b=setup(board(2,2),changes);
+ const ra=E.scoreSlide(a,E.slide(a.board,'left'),'left'),rb=E.scoreSlide(b,E.slide(b.board,'left'),'left');
+ assert.deepEqual(ra,rb);assert.ok(ra.points>0);assert.ok(ra.lines.some(x=>x.label==='Jackpot roll'));assert.ok(ra.lines.some(x=>x.label==='Mystery roll'));assert.ok(ra.lines.some(x=>x.label==='Loaded Coin'));assert.ok(ra.lines.some(x=>x.label==='Chaos Theory'));
+});
+test('Encore rewards a deliberate setup slide and Foil Stamp follows a tile',()=>{
+ const encore=setup(board(2,4),{relics:['encore']});assert.ok(E.move(encore,'right'));assert.equal(encore.encoreReady,true);encore.board=board(2,2);assert.ok(E.move(encore,'left'));assert.ok(encore.last.triggers.includes('encore'));
+ const foil=setup(board(2,2),{powers:['engrave']});assert.ok(E.usePower(foil,0,0));assert.equal(foil.marks[0],'foil');assert.ok(E.move(foil,'left'));assert.ok(foil.last.triggers.includes('engrave'));assert.equal(foil.marks[0],'foil');
+});
+test('Chaos rolls at round start and Lucky Break is shown in the receipt',()=>{
+ const chaos=E.newRun({seed:'CHAOS-CHECK'});chaos.relics=['chaos'];E.startRound(chaos);assert.ok(chaos.chaosRoll>=1&&chaos.chaosRoll<=6);assert.ok([.7,.85,1,1.2,1.5,2].includes(chaos.chaosFactor));
+ const lucky=setup(board(128,128),{relics:['lucky']});assert.ok(E.move(lucky,'left'));assert.equal(lucky.phase,'cleared');assert.ok(lucky.receipt.luckyRoll>=1&&lucky.receipt.luckyRoll<=6);assert.ok([0,2,8].includes(lucky.receipt.lucky));
+});
 test('all four bosses apply their announced rules',()=>{
  const toll=setup(board(2,2),{round:2,relics:['spark']});assert.equal(E.scoreSlide(toll,E.slide(toll.board,'left'),'left').chips,8);
  const tide=setup(board(2,2),{round:5,turn:2});E.move(tide,'left');assert.equal(tide.last.spawns.length,2);

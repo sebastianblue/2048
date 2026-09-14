@@ -6,12 +6,13 @@ A complete browser-based 2048 roguelite. Plain HTML, CSS and JavaScript; no runt
 
 Run `npm start`, then open `http://127.0.0.1:4178/`. Use arrows, WASD, touch swipes or on-screen direction buttons. Equal tiles merge once per slide. Beat each round's score target before spending your moves. Shops appear between rounds; the twelfth round is the final boss.
 
-- 18 relics, 6 consumable powerups, five relic slots, three powerup slots.
-- 12 rounds in four antes, four visible boss rules, three starting kits.
+- 27 jokers, 7 consumable powerups, five joker slots, three powerup slots.
+- 12 rounds in four antes, four visible boss rules, four starting kits.
 - Standard, Easygoing and unlockable High Stakes modes; fixed daily seeds use UTC.
 - Device-local automatic saves, optional procedural sound, reduced motion, keyboard controls.
+- Hand-stamped house look: green felt, paper tickets, gold trim, and bold marker-like type make the table feel authored rather than templated.
 - Juicy feedback: moving ghost tiles, new-tile drop-ins, merge pops, spark bursts, score floaters, board flashes, score-panel pulses, shop/dialog motion, and distinct move/merge/power/shop/win/loss tones. Sound is on for new players, remembers the user's choice, and has a volume slider in Pause.
-- Relic selection and tile generation use separate seeded random streams.
+- Joker rolls are keyed to the run seed, so wild outcomes are repeatable and rewinds stay fair. Foil Stamp lets you upgrade an individual board tile; the stamp moves through slides and pays when it merges.
 
 ## Playtest logs
 
@@ -21,7 +22,7 @@ Use **Feedback & logs** to attach a note to the current state or download the br
 
 ## Checks
 
-`npm test`: 20 engine checks covering movement, conservation, relic math, all bosses, shop restrictions, economy, powerups, recovery, deterministic replay, saves and a complete winning run.
+`npm test`: 23 engine checks covering movement, conservation, joker math, all bosses, shop restrictions, economy, powerups, recovery, deterministic replay, saves and a complete winning run.
 
 `npm run balance -- 500`: deterministic simulation with three policies. See `DESIGN.md` for the final results and limitations.
 
