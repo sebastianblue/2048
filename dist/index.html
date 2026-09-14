@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#15141c">
+  <title>Double or Nothing — 2048 Roguelite</title>
+  <meta name="description" content="Slide. Merge. Break the rules. A 2048 roguelite with wild relic combinations, tactical powerups, shops and twelve escalating rounds.">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23cbf568'/%3E%3Ctext x='32' y='47' text-anchor='middle' font-size='44' font-weight='900' font-family='sans-serif' fill='%2315141c'%3E2%3C/text%3E%3C/svg%3E">
+  <link rel="stylesheet" href="./style.css">
+  <script type="module" src="./app.js"></script>
+</head>
+<body>
+  <header class="topbar"><a class="brand" href="./" aria-label="Double or Nothing home"><span class="brand-mark">2<span>×</span></span><span>DOUBLE<br>OR NOTHING<span class="edition">2048 / ROGUELITE</span></span></a><nav><button class="quiet" data-action="help">How to play <span>?</span></button><button class="icon-button" data-action="sound" id="sound-button" aria-label="Enable sound" aria-pressed="false">♪</button><button class="icon-button" data-action="pause" aria-label="Pause game">Ⅱ</button></nav></header>
+  <main id="app"></main>
+  <footer><span>A LITTLE STRATEGY. A LITTLE LUCK.</span><span class="footer-links"><button class="text-button" data-action="feedback">Feedback & logs</button><button class="text-button" data-action="notes">Design notes</button></span><span id="save-status">SAVED ON THIS DEVICE</span></footer>
+  <dialog id="modal" aria-labelledby="modal-title"><div id="modal-content"></div></dialog>
+  <div id="toast" role="status" aria-live="polite"></div>
+  <div class="sr-only" id="announcement" aria-live="polite" aria-atomic="true"></div>
+</body>
+</html>

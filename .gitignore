@@ -1,0 +1,5 @@
+.DS_Store
+node_modules/
+playtests/
+.sites-runtime/
+*.tar.gz

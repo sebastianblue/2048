@@ -1,0 +1,7 @@
+{
+  "name": "double-or-nothing",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {"test": "node --test tests/engine.test.js", "balance": "node tests/balance.js", "start": "node server.js"}
+}
