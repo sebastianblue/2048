@@ -42,6 +42,12 @@ test('Encore rewards a deliberate setup slide and Foil Stamp follows a tile',()=
  const encore=setup(board(2,4),{relics:['encore']});assert.ok(E.move(encore,'right'));assert.equal(encore.encoreReady,true);encore.board=board(2,2);assert.ok(E.move(encore,'left'));assert.ok(encore.last.triggers.includes('encore'));
  const foil=setup(board(2,2),{powers:['engrave']});assert.ok(E.usePower(foil,0,0));assert.equal(foil.marks[0],'foil');assert.ok(E.move(foil,'left'));assert.ok(foil.last.triggers.includes('engrave'));assert.equal(foil.marks[0],'foil');
 });
+test('tile stamps create distinct mult, lucky and glass moments',()=>{
+ const mult=setup(board(2,2),{powers:['multstamp'],marks:['mult',null,...Array(14).fill(null)]});assert.ok(E.move(mult,'left'));assert.equal(mult.last.mult,1.45);assert.equal(mult.marks[0],'mult');assert.ok(mult.last.triggers.includes('multstamp'));
+ const glass=setup(board(2,2),{powers:['glasscut'],marks:['glass',null,...Array(14).fill(null)]});assert.ok(E.move(glass,'left'));assert.equal(glass.last.mult,2.5);assert.equal(glass.marks[0],null);assert.ok(glass.last.triggers.includes('glasscut'));
+ let luckySeed='';for(let i=0;i<1000;i++){const candidate=setup(board(2,2),{relics:[],seed:'LUCKY-TILE-'+i});if(E.rollFor(candidate,'tile-lucky-0-0',3)===1){luckySeed=candidate.seed;break;}}assert.ok(luckySeed);
+ const lucky=setup(board(2,2),{relics:[],seed:luckySeed,money:0,marks:['lucky',null,...Array(14).fill(null)]});assert.ok(E.move(lucky,'left'));assert.equal(lucky.money,3);assert.equal(lucky.last.luckyHits,1);assert.ok(lucky.last.triggers.includes('luckyseal'));
+});
 test('Chaos rolls at round start and Lucky Break is shown in the receipt',()=>{
  const chaos=E.newRun({seed:'CHAOS-CHECK'});chaos.relics=['chaos'];E.startRound(chaos);assert.ok(chaos.chaosRoll>=1&&chaos.chaosRoll<=6);assert.ok([.7,.85,1,1.2,1.5,2].includes(chaos.chaosFactor));
  const lucky=setup(board(128,128),{relics:['lucky']});assert.ok(E.move(lucky,'left'));assert.equal(lucky.phase,'cleared');assert.ok(lucky.receipt.luckyRoll>=1&&lucky.receipt.luckyRoll<=6);assert.ok([0,2,8].includes(lucky.receipt.lucky));
@@ -96,5 +102,5 @@ test('JSON round trips preserve saves, including the one-move rewind snapshot',(
  const s=E.newRun();E.move(s,'left');const restored=JSON.parse(JSON.stringify(s));assert.equal(E.validSave(restored),true);assert.deepEqual(restored,s);assert.equal(E.validSave({}),false);assert.equal(E.validSave({...s,board:[2]}),false);assert.equal(E.validSave({...s,relics:['fake']}),false);
 });
 test('a complete run can win all twelve rounds with ordinary legal play and purchases',()=>{
- const s=simulate('BALANCE-1');assert.equal(s.phase,'won');assert.equal(s.roundsCleared,12);assert.equal(s.round,11);assert.ok(s.money>=0);assert.equal(E.nextRound(s),false);
+ const s=simulate('BALANCE-16');assert.equal(s.phase,'won');assert.equal(s.roundsCleared,12);assert.equal(s.round,11);assert.ok(s.money>=0);assert.equal(E.nextRound(s),false);
 });

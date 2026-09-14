@@ -37,8 +37,17 @@ export const POWERS = [
   {id:'rewind',name:'Rewind',icon:'↶',price:3,desc:'Undo the last slide, including its spawn, score and earnings.'},
   {id:'moves',name:'Extra Time',icon:'+5',price:4,desc:'Gain 5 moves this round.'},
   {id:'focus',name:'Overdrive',icon:'×2',price:4,desc:'Double the score of your next 3 scoring slides.'},
-  {id:'engrave',name:'Foil Stamp',icon:'✧',price:4,desc:'Mark one tile. Its mark moves with it and adds +50 chips when it merges.',target:true}
+  {id:'engrave',name:'Foil Stamp',icon:'✧',price:4,desc:'Mark one tile. Its mark moves with it and adds +50 chips when it merges.',target:true},
+  {id:'multstamp',name:'Mult Ink',icon:'×',price:5,desc:'Mark one tile. Every merge it joins adds +0.45×. The ink stays.',target:true},
+  {id:'luckyseal',name:'Lucky Seal',icon:'♣',price:5,desc:'Mark one tile. Its next two lucky hits have a 1-in-3 chance to pay $3 and add +0.60×.',target:true},
+  {id:'glasscut',name:'Glass Cut',icon:'◇',price:5,desc:'Mark one tile. Its next merge scores ×2.5, then the glass shatters.',target:true}
 ];
+export const TILE_TRAITS = {
+  foil:{label:'FOIL',icon:'✧',desc:'Adds +50 chips when it merges.'},
+  mult:{label:'MULT',icon:'×',desc:'Adds +0.45× when it merges.'},
+  lucky:{label:'LUCKY',icon:'♣',desc:'A 1-in-3 chance to pay $3 and add +0.60×.'},
+  glass:{label:'GLASS',icon:'◇',desc:'Scores ×2.5 once, then shatters.'}
+};
 export const KITS = [
   {id:'spark',name:'The Spark',icon:'✦',desc:'Pocket Spark + a Hammer. A little value from every merge.',relic:'spark',power:'hammer',money:5,unlock:0},
   {id:'banker',name:'The Banker',icon:'¤',desc:'Rainy Day + $9. Invest early; build your own scoring engine.',relic:'bank',power:'moves',money:9,unlock:3},
@@ -78,7 +87,7 @@ export function spawn(s) {
 }
 export function startRound(s) {
   const info=roundInfo(s.round,s.mode);s.phase='playing';s.score=0;s.combo=0;s.turn=0;s.previous=null;s.focus=0;s.scoringSlides=0;s.goldThisRound=0;s.undo=null;s.last=null;s.receipt=null;
-  s.encoreReady=false;s.chaosRoll=0;s.chaosFactor=1;
+  s.encoreReady=false;s.chaosRoll=0;s.chaosFactor=1;s.luckyTileHits=0;
   if(has(s,'chaos')) {s.chaosRoll=rollFor(s,'chaos-round');s.chaosFactor=[.7,.85,1,1.2,1.5,2][s.chaosRoll-1];}
   s.moves=info.moves+(has(s,'clock')?4:0);s.startMoves=s.moves;s.board=Array(16).fill(0);s.marks=Array(16).fill(null);
   s.spawnBase=2**info.act;s.next=s.spawnBase;
@@ -89,7 +98,7 @@ export function startRound(s) {
 }
 export function newRun({seed='LUCKY',kit='spark',mode='standard'}={}) {
   const k=KITS.find(x=>x.id===kit)||KITS[0];
-  return startRound({version:VERSION,seed:String(seed).slice(0,40),rng:hashSeed(seed),jokerRng:hashSeed(seed+'-joker'),shopRng:hashSeed(seed+'-shop'),kit:k.id,mode,round:0,relics:[k.relic],powers:[k.power],money:k.money,forge:0,growth:0,totalScore:0,totalMerges:0,highest:0,roundsCleared:0,spent:0,startedAt:Date.now(),phase:'playing',shop:[],rerolls:0,recorded:false,encoreReady:false,chaosRoll:0,chaosFactor:1});
+  return startRound({version:VERSION,seed:String(seed).slice(0,40),rng:hashSeed(seed),jokerRng:hashSeed(seed+'-joker'),shopRng:hashSeed(seed+'-shop'),kit:k.id,mode,round:0,relics:[k.relic],powers:[k.power],money:k.money,forge:0,growth:0,totalScore:0,totalMerges:0,highest:0,roundsCleared:0,spent:0,startedAt:Date.now(),phase:'playing',shop:[],rerolls:0,recorded:false,encoreReady:false,chaosRoll:0,chaosFactor:1,luckyTileHits:0});
 }
 export function slide(board,dir,marks=null) {
   if(!DIRS.includes(dir))return {board:[...board],merges:[],motions:[],changed:false};
@@ -112,9 +121,10 @@ export function slide(board,dir,marks=null) {
 export const canMove = board=>DIRS.some(d=>slide(board,d).changed);
 const axis=d=>['left','right'].includes(d)?'h':'v';
 export function scoreSlide(s,result,dir) {
-  if(!result.merges.length)return {chips:0,mult:1,points:0,lines:[],triggers:[],growth:s.growth};
+  if(!result.merges.length)return {chips:0,mult:1,points:0,lines:[],triggers:[],growth:s.growth,cash:0,luckyHits:0,consumedMarks:[]};
   const info=roundInfo(s.round,s.mode),merges=result.merges,empty=result.board.filter(v=>!v).length;
-  let chips=0,mult=1+Math.min(s.combo,5)*0.15,growth=s.growth;
+  let chips=0,mult=1+Math.min(s.combo,5)*0.15,growth=s.growth,cash=0,luckyHits=0;
+  const consumedMarks=[];
   const lines=[],triggers=[];
   for(const m of merges) chips+=m.value*(info.boss&&info.act===1&&m.value<=8?0.5:1);
   lines.push({label:'Merged tiles',value:chips});
@@ -126,7 +136,20 @@ export function scoreSlide(s,result,dir) {
   if(has(s,'compass')&&s.previous&&axis(s.previous)!==axis(dir))add('compass',30);
   if(has(s,'prism'))add('prism',12*new Set(result.board.filter(Boolean)).size);
   if(has(s,'orbit'))add('orbit',8*result.board.filter(v=>v>=32).length);
-  if(merges.some(m=>m.marked)) {const bonus=50*merges.filter(m=>m.marked).length;chips+=bonus;lines.push({label:'Foil Stamp',value:bonus});triggers.push('engrave');}
+  if(merges.some(m=>m.marked)) {
+    const foilCount=merges.filter(m=>m.marked&&result.marks?.[m.index]==='foil').length;
+    if(foilCount){const bonus=50*foilCount;chips+=bonus;lines.push({label:'Foil Stamp',value:bonus});triggers.push('engrave');}
+    const multCount=merges.filter(m=>m.marked&&result.marks?.[m.index]==='mult').length;
+    if(multCount){const bonus=.45*multCount;mult+=bonus;lines.push({label:'Mult Ink',value:'+'+bonus.toFixed(2)+'×'});triggers.push('multstamp');}
+    const luckyMerges=merges.filter(m=>m.marked&&result.marks?.[m.index]==='lucky');
+    for(let i=0;i<luckyMerges.length;i++) {
+      if((s.luckyTileHits??0)+luckyHits>=2)break;
+      const roll=rollFor(s,`tile-lucky-${luckyMerges[i].index}-${i}`,3);
+      if(roll===1){cash+=3;luckyHits++;mult+=.6;lines.push({label:'Lucky Seal',value:'LUCKY → +$3, +0.60×'});triggers.push('luckyseal');}
+    }
+    const glassMerges=merges.filter(m=>m.marked&&result.marks?.[m.index]==='glass');
+    if(glassMerges.length){const factor=2.5**glassMerges.length;mult*=factor;lines.push({label:'Glass Cut',value:'×'+factor.toFixed(2)});triggers.push('glasscut');glassMerges.forEach(m=>consumedMarks.push(m.index));}
+  }
   if(has(s,'mystery')) {const roll=rollFor(s,'mystery');const bonus=(roll-1)*16*(has(s,'prism')?2:1);add('mystery',bonus);lines.push({label:'Mystery roll',value:`${roll} → +${bonus}`});}
   if(has(s,'echo')) {const bonus=Math.min(s.combo,5)*0.2;mult+=bonus;if(bonus){triggers.push('echo');lines.push({label:'Echo Chamber',value:'+'+bonus.toFixed(2)+'×'});}}
   if(has(s,'twins')&&merges.length>=2)multiply('twins',1.6);
@@ -147,7 +170,7 @@ export function scoreSlide(s,result,dir) {
   if(s.focus) {mult*=2;lines.push({label:'Overdrive',value:'×2'});}
   if(info.boss&&info.act===3&&s.previous===dir){mult*=0.5;lines.push({label:'The Pendulum',value:'×0.5'});}
   if(info.boss&&info.act===4){mult*=0.7;lines.push({label:'The House',value:'×0.7'});}
-  return {chips,mult,points:Math.round(chips*mult),lines,triggers,growth};
+  return {chips,mult,points:Math.round(chips*mult),lines,triggers,growth,cash,luckyHits,consumedMarks};
 }
 export function move(s,dir) {
   if(s.phase!=='playing'||s.moves<=0)return false;
@@ -155,7 +178,7 @@ export function move(s,dir) {
   const result=slide(s.board,dir,s.marks);if(!result.changed)return false;
   const before=clone(s);before.undo=null;s.undo=before;
   const scored=scoreSlide(s,result,dir);s.board=result.board;s.marks=result.marks??s.marks;s.moves--;s.turn++;
-  s.score+=scored.points;s.totalScore+=scored.points;s.totalMerges+=result.merges.length;s.growth=scored.growth;
+  s.score+=scored.points;s.totalScore+=scored.points;s.totalMerges+=result.merges.length;s.growth=scored.growth;s.money+=scored.cash??0;s.luckyTileHits=(s.luckyTileHits??0)+(scored.luckyHits??0);(scored.consumedMarks??[]).forEach(i=>{if(s.marks[i]==='glass')s.marks[i]=null;});
   s.combo=result.merges.length?s.combo+1:0;
   if(result.merges.length){s.scoringSlides++;if(s.focus)s.focus--;}
   if(has(s,'gold')&&result.merges.some(m=>m.value>=32)&&s.goldThisRound<3){s.money++;s.goldThisRound++;scored.triggers.push('gold');}
@@ -205,9 +228,10 @@ export function nextRound(s) {if(s.phase!=='shop'||s.round>=11)return false;s.ro
 export function usePower(s,index,target=null) {
   if(!['playing','danger'].includes(s.phase))return false;
   const id=s.powers[index];if(!id)return false;
-  if(['hammer','promote','engrave'].includes(id)&&(!Number.isInteger(target)||target<0||target>15||!s.board[target]))return false;
+  const traitForPower={engrave:'foil',multstamp:'mult',luckyseal:'lucky',glasscut:'glass'};
+  if(['hammer','promote',...Object.keys(traitForPower)].includes(id)&&(!Number.isInteger(target)||target<0||target>15||!s.board[target]))return false;
   if(id==='promote'&&s.board[target]>256)return false;
-  if(id==='engrave'&&(s.marks?.[target]||false))return false;
+  if(traitForPower[id]&&(s.marks?.[target]||false))return false;
   if(id==='rewind') {
     if(!s.undo)return false;
     const currentPowers=[...s.powers];currentPowers.splice(index,1);
@@ -216,7 +240,7 @@ export function usePower(s,index,target=null) {
   s.marks??=Array(16).fill(null);
   if(id==='hammer'){s.board[target]=0;s.marks[target]=null;}
   if(id==='promote'){s.board[target]*=2;s.highest=Math.max(s.highest,...s.board);}
-  if(id==='engrave')s.marks[target]='foil';
+  if(traitForPower[id])s.marks[target]=traitForPower[id];
   if(id==='shuffle'){
     const pairs=shuffled(s,s.board.map((value,index)=>({value,mark:s.marks[index]??null})));
     s.board=pairs.map(x=>x.value);s.marks=pairs.map(x=>x.mark);
@@ -228,5 +252,5 @@ export function usePower(s,index,target=null) {
 }
 export function finish(s){if(!['won','lost'].includes(s.phase))s.phase='lost';s.undo=null;return s;}
 export function validSave(s) {
-  return !!s&&s.version===VERSION&&Array.isArray(s.board)&&s.board.length===16&&s.board.every(v=>Number.isSafeInteger(v)&&v>=0&&(v===0||Number.isInteger(Math.log2(v))))&&(!s.marks||Array.isArray(s.marks)&&s.marks.length===16&&s.marks.every(v=>v===null||v==='foil'))&&Number.isInteger(s.round)&&s.round>=0&&s.round<12&&['playing','danger','cleared','shop','won','lost'].includes(s.phase)&&Array.isArray(s.relics)&&s.relics.every(id=>!!relic(id))&&Array.isArray(s.powers)&&s.powers.every(id=>!!power(id))&&Number.isFinite(s.money)&&Number.isFinite(s.rng)&&Number.isFinite(s.shopRng);
+  return !!s&&s.version===VERSION&&Array.isArray(s.board)&&s.board.length===16&&s.board.every(v=>Number.isSafeInteger(v)&&v>=0&&(v===0||Number.isInteger(Math.log2(v))))&&(!s.marks||Array.isArray(s.marks)&&s.marks.length===16&&s.marks.every(v=>v===null||Object.prototype.hasOwnProperty.call(TILE_TRAITS,v)))&&Number.isInteger(s.round)&&s.round>=0&&s.round<12&&['playing','danger','cleared','shop','won','lost'].includes(s.phase)&&Array.isArray(s.relics)&&s.relics.every(id=>!!relic(id))&&Array.isArray(s.powers)&&s.powers.every(id=>!!power(id))&&Number.isFinite(s.money)&&Number.isFinite(s.rng)&&Number.isFinite(s.shopRng);
 }

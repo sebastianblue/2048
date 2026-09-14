@@ -2,7 +2,7 @@
 
 ## Research translated into rules
 
-1. **A familiar core with comfortable repetition.** LocalThunk's [Solitaire essay](https://localthunk.com/blog/solitaire) describes familiar solo play and progression that guides experimentation. Here, standard 2048 movement remains intact. Alternate kits open after clearing rounds 3 and 6; higher stakes unlock after a win. There are no permanent score bonuses to grind. The fourth starting kit unlocks after clearing round 9 and spotlights the Jackpot plus Foil Stamp combo.
+1. **A familiar core with comfortable repetition.** LocalThunk's [Solitaire essay](https://localthunk.com/blog/solitaire) describes familiar solo play and progression that guides experimentation. Here, standard 2048 movement remains intact. Alternate kits open after clearing rounds 3, 6, and 9; higher stakes unlock after a win. There are no permanent score bonuses to grind. The fourth starting kit unlocks after clearing round 9 and spotlights the Jackpot plus Foil Stamp combo.
 2. **Strong synergies and varied challenges.** In [Mega Crit's designer interview](https://www.gamedeveloper.com/game-platforms/road-to-the-igf-mega-crit-games-i-slay-the-spire-i-), Anthony Giovannetti discusses combos, layered risk/reward and enemies that test different strategies. The game uses five joker slots, conditional chips and multipliers, economy decisions and four announced boss rules. Shop rerolls and guaranteed workshop upgrades keep random offers from being the only route forward. Small Change stops appearing in shops before ante three, where its small-tile condition can no longer trigger.
 3. **Metrics plus human feedback.** Mega Crit's [2019 GDC balance presentation](https://media.gdcvault.com/gdc2019/presentations/Giovannetti_Anthony_SlayTheSpire.pdf) emphasizes iteration and interpreting metrics alongside playtests. Automated policies calibrate the initial curve. Actual playtest notes, purchase choices and loss states should drive future changes.
 
@@ -31,7 +31,7 @@ Twelve rounds in four antes. A round has 24 moves in ante one, then 26. Each boa
 
 The table uses a green-felt and paper-ticket visual language so the run reads as a physical house game. The shop now has 27 jokers with three kinds of payoff: reliable chips, conditional multipliers, and deliberately swingy rolls. Jackpot, Loaded Coin and Chaos Theory create visible variance with floors that cannot erase a scoring slide. Encore rewards spending a move on setup; One-Trick Pony rewards a single clean merge; Pair-a-Dice and Crown Jewels reward shaping the post-merge board. Mystery Meat and Lucky Break add smaller, capped swings to chips and cash.
 
-Foil Stamp is a targeted powerup that upgrades one occupied board tile. The foil mark travels with that tile through slides and survives merges, adding 50 chips whenever it participates in a merge. It is a bounded, physical-feeling upgrade: one slot, one mark, no permanent stat grind.
+Tile stamps are targeted powerups that upgrade one occupied board tile. Foil adds 50 chips when it merges. Mult Ink adds +0.45× whenever it merges and persists. Lucky Seal gets two seeded 1-in-3 chances to pay $3 and add +0.60×. Glass Cut scores ×2.5 on its next merge and then shatters. Each tile can hold one mark; the mark travels through slides and merges, so the player chooses between protecting a marked tile and cashing it in.
 
 ## Score and economy
 
