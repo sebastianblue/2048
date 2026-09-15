@@ -1,20 +1,158 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#123d35">
-  <title>Double or Nothing — 2048 Roguelite</title>
-  <meta name="description" content="Slide. Merge. Break the rules. A 2048 roguelite with wild joker combinations, foil-stamped tiles, tactical powerups, shops and twelve escalating rounds.">
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23cbf568'/%3E%3Ctext x='32' y='47' text-anchor='middle' font-size='44' font-weight='900' font-family='sans-serif' fill='%2315141c'%3E2%3C/text%3E%3C/svg%3E">
-  <link rel="stylesheet" href="./style.css">
-  <script type="module" src="./app.js"></script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#202c2b">
+<meta name="description" content="2048: ANTE. Build your deck. Beat the house.">
+<title>2048: ANTE</title>
+<link rel="icon" href="./favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="./fonts.css">
+<link rel="stylesheet" href="./style.css">
 </head>
 <body>
-  <header class="topbar"><a class="brand" href="./" aria-label="Double or Nothing home"><span class="brand-mark">2<span>×</span></span><span>DOUBLE<br>OR NOTHING<span class="edition">2048 / HOUSE CUT</span></span></a><nav><button class="quiet" data-action="help">How to play <span>?</span></button><button class="icon-button" data-action="sound" id="sound-button" aria-label="Enable sound" aria-pressed="false">♪</button><button class="icon-button" data-action="pause" aria-label="Pause game">Ⅱ</button></nav></header>
-  <main id="app"></main>
-  <footer><span>A LITTLE STRATEGY. A LITTLE LUCK.</span><span class="footer-links"><button class="text-button" data-action="feedback">Feedback & logs</button><button class="text-button" data-action="notes">Design notes</button></span><span id="save-status">SAVED ON THIS DEVICE</span></footer>
-  <dialog id="modal" aria-labelledby="modal-title"><div id="modal-content"></div></dialog>
-  <div id="toast" role="status" aria-live="polite"></div>
-  <div class="sr-only" id="announcement" aria-live="polite" aria-atomic="true"></div>
-</body>
-</html>
+<div class="app" id="app">
+  <header class="top">
+    <div class="brand" aria-label="2048 Ante"><span class="brand-number">2048</span><span>ANTE<span class="brand-dot">•</span></span></div>
+    <div class="round-track" id="roundtrack" aria-label="Round progression"><span class="active">01</span><i></i><span>02</span><i></i><span class="boss">B</span></div>
+    <nav class="topr" aria-label="Game controls">
+      <button id="btnsound" title="Sound settings">♫ <span>Sound</span></button>
+      <button id="btnhelp">? <span>Rules</span></button>
+      <button id="btnabandon" title="Pause · Esc">Ⅱ <span>Menu</span></button>
+    </nav>
+  </header>
+  <aside class="left">
+    <div class="roundhead"><div class="ante" id="antelbl">Ante 1<small id="runlbl">Round 1 / 24</small></div><span class="stamp" id="blindlbl">Opening</span></div>
+    <div class="scoreboard">
+      <div class="score-label">Round score <span id="pctlbl">0%</span></div>
+      <div class="round-score" id="scorelbl">0</div>
+      <div class="bar"><i id="barfill"></i></div>
+      <div class="target"><span>TO BEAT</span><b id="targetlbl">550</b></div>
+    </div>
+    <div class="stats">
+      <div class="stat moves"><span class="lbl">Moves</span><span class="num" id="moveslbl">24</span></div>
+      <div class="stat money"><span class="lbl">Cash</span><span class="num" id="moneylbl">$4</span></div>
+      <div class="stat chain" title="Consecutive scoring moves add mult. A move with no merge breaks the chain."><span class="lbl">Chain</span><span class="num" id="chainlbl">—</span></div>
+    </div>
+    <div class="bossnote" id="bossnote" style="display:none"></div>
+    <div class="rubble-clock"><span class="rubble-mark">✕</span><div>Rubble in <b id="rubblelbl">6 moves</b><small>Merge in its row or column to clear it.</small></div></div>
+    <details class="history"><summary>Round history</summary><div class="log" id="log"></div></details>
+    <span id="seedlbl" class="seed-label"></span>
+  </aside>
+  <section class="rack" aria-label="Your charms">
+    <h3>Charms <span id="charmcount">0 / 5</span><small>Trigger left → right</small></h3>
+    <div class="tray" id="charmtray"></div>
+  </section>
+  <main class="center">
+    <div class="board-bezel">
+      <div class="board-label"><span id="boardstatus">MAKE YOUR MOVE</span><span>4 × 4</span></div>
+      <div class="boardwrap"><div class="board" id="board" aria-label="2048 game board" tabindex="0"><div class="cells" id="cells"></div><div class="tiles" id="tiles"></div></div></div>
+      <div class="board-footer"><span class="led"></span><span id="hint" class="hint">Arrow keys / WASD / swipe</span><span class="housing-mark">A—08</span></div>
+    </div>
+    <div class="bankbar" id="bankbar"><span id="bankhint">Merge matching tiles to score.</span><button class="btn" id="btncashnow" style="display:none">Bank round <span id="overlbl"></span><kbd>Space</kbd></button></div>
+    <div class="dpad" aria-label="Move tiles"><button data-dir="left" aria-label="Left">←</button><button data-dir="up" aria-label="Up">↑</button><button data-dir="down" aria-label="Down">↓</button><button data-dir="right" aria-label="Right">→</button></div>
+  </main>
+  <aside class="right">
+    <section class="draws"><h3>Next draw <span id="pilelbl"></span></h3><div class="nextrow" id="nextrow"></div><details><summary>Your deck <span id="deckcount"></span></summary><div class="deckcomp" id="deckcomp"></div><p class="deckmeta">Draws reshuffle when the deck runs out. Buy packs and use deck upgrades in the shop.</p></details></section>
+    <section class="score-tape"><h3>Last move <span>CHIPS × MULT</span></h3><div class="tape" id="calc"><div class="idle">Make a merge to score.</div></div></section>
+    <section class="pocket"><h3>Items <span id="conscount">0 / 3</span></h3><div class="tray" id="constray"></div></section>
+    <div class="cabinet-sign"><b>DOUBLE UP.</b><b>CASH OUT.</b><span>Eight antes. One way out.</span></div>
+  </aside>
+  <footer class="footer"><span>2048: ANTE <small>1.4</small></span><button id="btntlog">Run history & export</button><button id="btncredits">Credits</button></footer>
+</div>
+<div class="ov show" id="ov-start"><div class="modal title-screen">
+  <div class="title-top"><span>A SLIDING TILE ROGUELITE</span><span>8 ANTES / 24 ROUNDS</span></div>
+  <div class="title-art" aria-hidden="true"><span class="title-tile one">8<small>+4 PLUS</small></span><span class="title-tile two">8<small>×2 PRISM</small></span><span class="title-tile three">16<small>DOUBLE UP</small></span></div>
+  <div class="title-wordmark"><span>2048:</span><h1>ANTE<span>•</span></h1></div>
+  <p class="title-tagline">Build your deck. Beat the house.</p>
+  <div class="title-actions"><button class="btn" id="btnstart">New run <span>→</span></button><button class="btn ghost" id="btntitlerules">How to play</button></div>
+  <details class="seed-option"><summary>Set a seed</summary><label for="seedin">Run seed</label><input id="seedin" placeholder="Leave blank for a random run" maxlength="48" autocomplete="off"><small>The same seed repeats the draws and shop offers.</small></details>
+  <div class="meta" id="metastats"></div><div class="title-bottom"><span>ARROWS · WASD · SWIPE</span><button id="btntitlesound">♫ Sound settings</button></div>
+</div></div>
+<div class="ov" id="ov-help"><div class="modal rules-screen">
+  <span class="eyebrow">THE RULES</span><h2>Make every move count.</h2>
+  <div class="rules-demo"><span class="mini" data-v="8">8</span><span>+</span><span class="mini" data-v="8">8</span><span>→</span><span class="mini" data-v="16">16</span><b>16 chips × mult</b></div>
+  <div class="rules">
+    <div><b>01 / Merge & score</b><p>Slide with the arrow keys, WASD, or a swipe. Matching tiles merge once per move. The tiles you make add chips.</p></div>
+    <div><b>02 / Build your mult</b><p>Start at 1 mult. Each extra merge in a move adds +2. Consecutive scoring moves build a chain for more mult. A move with no merge breaks it.</p></div>
+    <div><b>03 / Beat the target</b><p>You have 24 moves. Reach the target, then bank the round or keep going for up to $10 extra. A locked board costs your overflow bonus. Unused moves do not pay.</p></div>
+    <div><b>04 / Spend between rounds</b><p>Buy charms, items, and tile packs. Every shop offers one workshop job. Charms stay for the run. The board resets each round; your deck and upgrades stay. Your deck holds 12–22 tiles. Save cash to earn $1 interest per $5, up to $5.</p></div>
+    <div><b>05 / Clear the rubble</b><p>Rubble blocks a cell. Merge in its row or column to smash it for 25 chips. It falls more often later in the round. Boss walls cannot be cleared.</p></div>
+    <div><b>06 / Upgrade your tiles</b><p>Both tiles’ enhancements activate when they merge; the result keeps one. Stamps permanently enhance one tile in your deck. Workshop jobs copy, convert, or remove tiles. Archive sends a board tile into your deck.</p></div>
+  </div>
+  <h3>Tile enhancements</h3><div class="enhlist" id="enhlist"></div>
+  <p class="rule-note">Charms trigger left to right. Additions build the base mult; × effects multiply it. Odd/even charms refer to powers of two: odd is 2, 8, 32…; even is 4, 16, 64…</p>
+  <div class="btnrow"><button class="btn" id="btnhelpclose">Got it</button></div>
+</div></div>
+<div class="ov" id="ov-tlog"><div class="modal">
+  <h2>Playtest log</h2>
+  <p>Your last 25 runs are saved on this device. Export them to share a playtest.</p>
+  <textarea class="tlog" id="tlogtext" readonly></textarea>
+  <div class="btnrow"><button class="btn" id="btntlogcopy">Copy to clipboard</button><button class="btn ghost" id="btntlogdownload">Download JSON</button><button class="btn ghost" id="btntlogclear" hidden>Clear logs</button><button class="btn ghost" id="btntlogclose">Back</button></div>
+</div></div>
+
+<div class="ov" id="ov-boss"><div class="modal">
+  <h2>Boss round</h2>
+  <div class="bossintro"><div class="nm" id="bossnm"></div><p id="bossdesc"></p></div>
+  <p id="bossprep"></p>
+  <div class="btnrow"><button class="btn" id="btnbossgo">Play boss round</button></div>
+</div></div>
+
+<div class="ov" id="ov-cash"><div class="modal">
+  <h2 id="cashtitle">Round won</h2>
+  <div class="cash" id="cashlines"></div>
+  <div class="shopsec" id="retirehead"><h3>File a tile <span id="retirenote"></span></h3>
+    <p style="margin:0 0 8px;font-size:12.5px">The rest of the board is swept before the next round, so this is the only tile you keep. It pushes out your smallest card once the deck is full, and enhanced cards cap at a third of the deck. Bigger tiles make richer draws &mdash; and more dangerous ones.</p>
+    <div class="packgrid" id="retirebox"></div></div>
+  <div class="btnrow"><button class="btn" id="btncash">Visit shop →</button></div>
+</div></div>
+
+<div class="ov" id="ov-shop"><div class="modal">
+  <div class="shophead"><h2 style="margin:0">Shop</h2><div class="wallet" id="shopwallet">$0</div></div>
+  <p id="shopnext"></p>
+  <div class="shopgrid" id="shopgrid"></div>
+  <div class="shopsec"><h3>Deck <span id="shopdeck"></span></h3><div class="deckrow" id="deckrow"></div></div>
+  <div class="shopsec workshop"><h3>Workshop <span id="workshopnote"></span></h3><div id="workshoprow" class="workshop-row"></div><div class="backroom-offer"><p><b>Need something stronger?</b> Experimental deck edits with a tradeoff.</p><button class="buy" id="btnbackroom">Backroom · $8</button></div></div>
+  <div class="shopsec"><h3>Permit <span>Lasts for this run</span></h3><div id="voucherbox"></div></div>
+  <div class="btnrow">
+    <button class="btn ghost" id="btnreroll">Reroll $5</button>
+    <button class="btn" id="btnshopnext">Next round</button>
+  </div>
+  <div class="shopsec owned"><h3>Your charms <span>◀ ▶ reorder · sell prices below</span></h3><div class="tray" id="shopcharms"></div></div>
+</div></div>
+
+<div class="ov over" id="ov-pack"><div class="modal">
+  <h2 id="packtitle">Tile pack</h2>
+  <p id="packnote">Pick one card to add to your deck.</p>
+  <div class="packgrid" id="packgrid"></div>
+  <div class="btnrow"><button class="btn ghost" id="btnpackskip">Skip</button></div>
+</div></div>
+
+<div class="ov" id="ov-over"><div class="modal">
+  <h1 id="overtitle">Run over</h1>
+  <p id="overtext"></p>
+  <div class="cash" id="overlines"></div>
+  <div class="btnrow"><button class="btn" id="btnagain">New run</button><button class="btn ghost" id="btncontinue" style="display:none">Play endless</button></div>
+</div></div>
+
+<div class="ov over" id="ov-settings"><div class="modal compact">
+  <span class="eyebrow">AUDIO</span><h2>Sound settings</h2>
+  <label class="setting-row" for="musicvol"><span>Music <output id="musicout">28%</output></span><input id="musicvol" type="range" min="0" max="100" value="28"></label>
+  <label class="setting-row" for="sfxvol"><span>Effects <output id="sfxout">65%</output></span><input id="sfxvol" type="range" min="0" max="100" value="65"></label>
+  <label class="setting-row" for="track"><span>On the turntable</span><select id="track"><option value="auto">Shuffle the house set</option><option value="starlight">Starlight Lounge</option><option value="bossa">Bossa Lounger</option><option value="swing">Side Pocket Swing</option><option value="velvet">Velvet Switch</option><option value="wildcard">Wildcard Shuffle</option><option value="headspin">Headspin</option><option value="highlight">House Lights</option><option value="fireside">After Hours</option></select></label>
+  <button class="audio-toggle" id="btnmute">Mute all sound <kbd>M</kbd></button>
+  <p class="audio-credit">Music and foley from your Apple iLife library.</p><p id="audiostatus" class="audio-credit" role="status"></p>
+  <div class="btnrow"><button class="btn" id="btnsettingsclose">Done</button></div>
+</div></div>
+<div class="ov over" id="ov-pause"><div class="modal compact">
+  <span class="eyebrow">TAKE YOUR TIME</span><h2>Paused</h2><div class="pause-actions"><button class="btn" id="btnresume">Keep playing →</button><button class="btn ghost" id="btnpauserules">Rules</button><button class="btn ghost" id="btnpausesound">Sound</button><button class="btn ghost danger" id="btnendrun">End this run</button></div>
+</div></div>
+<div class="ov over" id="ov-confirm"><div class="modal compact"><h2>End this run?</h2><p>Your run will be recorded as abandoned.</p><div class="btnrow"><button class="btn ghost" id="btnkeep">Keep playing</button><button class="btn danger" id="btnconfirmend">End run</button></div></div></div>
+<div class="ov over" id="ov-credits"><div class="modal compact"><span class="eyebrow">2048: ANTE</span><h2>Credits</h2><p>A game by Sebastian.<br>Based on 2048. Inspired by Balatro.</p><p>Music: <b>the house set</b>.<br>Foley: Apple iLife and Final Cut Pro sound effects.<br>Typeface: Barlow, by Jeremy Tribby.</p><div class="btnrow"><button class="btn" id="btncreditsclose">Back</button></div></div></div>
+<div class="ov over" id="ov-inspect"><div class="modal compact"><span class="eyebrow" id="inspectrarity"></span><div class="inspect-seal" id="inspecticon"></div><h2 id="inspectname"></h2><p id="inspectdesc"></p><div class="btnrow"><button class="btn" id="btninspectclose">Back</button></div></div></div>
+<div class="ov over" id="ov-deckedit"><div class="modal deck-editor"><span class="eyebrow">DECK WORKSHOP</span><div class="shophead"><h2 id="editname">Recast</h2><span id="editcount"></span></div><p id="editdesc"></p><div id="editenh" class="enh-choices"></div><div id="editstep" class="edit-step"></div><div id="editgrid" class="edit-grid"></div><div id="editpreview" class="edit-preview" aria-live="polite"></div><div class="btnrow"><button class="btn ghost" id="btneditcancel">Cancel</button><button class="btn" id="btneditapply" disabled>Apply</button></div></div></div>
+<div class="ov over" id="ov-backroom"><div class="modal"><span class="eyebrow">EXPERIMENTAL JOBS</span><h2>The backroom</h2><p>One job per shop. Pick your tiles and review the result before paying.</p><div id="backroomgrid" class="backroom-grid"></div><div class="btnrow"><button class="btn ghost" id="btnbackroomclose">Back to shop</button></div></div></div>
+
+<div id="announcer" class="sr-only" role="status" aria-live="polite"></div>
+<script src="./audio.js"></script><script src="./game.js"></script>
+</body></html>

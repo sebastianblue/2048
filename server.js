@@ -21,7 +21,7 @@ http.createServer((req,res) => {
   if (!file.startsWith(root + path.sep)) {res.writeHead(403).end();return;}
   fs.readFile(file,(err,data) => {
     if (err) {res.writeHead(404).end('Not found');return;}
-    res.setHeader('Content-Type', ({'.html':'text/html','.js':'text/javascript','.css':'text/css','.svg':'image/svg+xml','.json':'application/json'})[path.extname(file)] || 'application/octet-stream');
+    res.setHeader('Content-Type', ({'.html':'text/html','.js':'text/javascript','.css':'text/css','.svg':'image/svg+xml','.json':'application/json','.mp3':'audio/mpeg','.wav':'audio/wav','.ogg':'audio/ogg'})[path.extname(file)] || 'application/octet-stream');
     res.setHeader('Cache-Control','no-store');res.end(data);
   });
 }).listen(4178, '127.0.0.1', () => console.log('http://127.0.0.1:4178'));
