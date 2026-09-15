@@ -28,11 +28,11 @@ window.AnteJuice = (() => {
     merges.forEach(m => {
       const e = elements.get(m.tile.id);
       e?.classList.remove('merge-heavy','merge-hit');
-      const heavy = m.v >= 64 || m.enhs.length > 0;
+      const heavy = m.v >= 256 || m.enhs.length > 0;
       pulse(e, heavy ? 'merge-heavy' : 'merge-hit');
-      burst(e, heavy ? 10 : 5, heavy ? 1.25 : .8);
+      if(heavy)burst(e, 7, 1);
     });
-    if (merges.length >= 3 || merges.some(m => m.v >= 128)) {
+    if (merges.some(m => m.v >= 256) || merges.filter(m => m.enhs.length > 0).length >= 2) {
       pulse(document.querySelector('.board-bezel'), 'cabinet-kick');
     }
   }

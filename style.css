@@ -35,9 +35,9 @@
 /* A short impact, a visible payoff, then a still board. */
 .impact-piece{position:fixed;width:5px;height:8px;z-index:90;border-radius:1px;pointer-events:none;animation:impact-fly .6s cubic-bezier(.12,.6,.3,1) forwards}
 @keyframes impact-fly{from{transform:translate(-50%,-50%) scale(1.25);opacity:1}to{transform:translate(calc(-50% + var(--dx)),calc(-50% + var(--dy))) rotate(var(--turn)) scale(.2);opacity:0}}
-.tile.merge-hit{animation:merge-squash .26s cubic-bezier(.2,.8,.3,1)}
+.tile.merge-hit{animation:merge-squash .16s cubic-bezier(.2,.8,.3,1)}
 .tile.merge-heavy{animation:merge-weight .34s cubic-bezier(.16,.8,.3,1)}
-@keyframes merge-squash{0%{scale:1.12 .84;filter:brightness(1.22)}45%{scale:.96 1.08}100%{scale:1}}
+@keyframes merge-squash{0%{scale:1.025 .98;filter:brightness(1.04)}45%{scale:.995 1.015}100%{scale:1}}
 @keyframes merge-weight{0%{scale:1.17 .8;filter:brightness(1.45)}35%{scale:.95 1.12}65%{scale:1.04 .97}100%{scale:1;filter:brightness(1)}}
 .cabinet-kick{animation:cabinet-kick .25s ease-out}
 @keyframes cabinet-kick{0%{translate:0 3px}25%{translate:2px -2px}55%{translate:-1px 1px}100%{translate:0 0}}
