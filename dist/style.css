@@ -64,3 +64,15 @@
 .reaction-guide{margin-top:20px;font-size:12px}.reaction-guide summary{font:700 21px var(--display);cursor:pointer}.reaction-guide p{font-size:12px}
 @media(max-width:700px){.reaction-pop{font-size:16px}.pack-wrapper{inset:90px 18% 80px}.pack-wrapper>span{font-size:28px}}
 @media(prefers-reduced-motion:reduce){.impact-piece,.reaction-pop,.pack-wrapper{display:none}.pack-deal,.cash-arrive,.round-stamp{animation:none!important;opacity:1;transform:none}}
+
+/* Every pack shares the same two shop slots. */
+.shopgrid.pack-stock{grid-template-columns:repeat(2,minmax(0,1fr));margin-bottom:12px}
+.pack-contents{font:700 18px var(--display);margin-top:12px;color:#435b3c}
+.pack-stock-card[data-pack-kind=backroom]{background:#dfd1bd!important}
+.pack-stock-card[data-pack-size=large]{border-bottom:4px solid #8b9b70}
+.pack-stock-card[data-pack-size=deluxe]{border:2px solid #ad8c42;box-shadow:0 3px 0 #b49c69}
+.pack-decknote{font-size:11px!important;color:#6f775f;margin:8px 0}
+.packgrid.expanded{grid-template-columns:repeat(3,minmax(0,1fr))}
+.packgrid .opt.taken{opacity:.3;filter:grayscale(.6)}
+.pack-modal{position:relative}
+@media(max-width:500px){.packgrid.expanded{grid-template-columns:repeat(2,minmax(0,1fr))}.pack-stock .card.con .t{font-size:20px}.pack-contents{font-size:16px}}

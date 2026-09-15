@@ -8,4 +8,12 @@ The approach follows Martin Jonasson and Petri Purho's [Juice It or Lose It](htt
 - Clearing a round stamps its result and feeds payout rows into the receipt. Boss clears receive a stronger burst and frame treatment.
 - Animation uses presentation-only randomness, separate from the game's seeded random draws. Particle counts are capped and elements are removed after the effect. Reduced-motion mode removes particle and wrapper motion.
 
-Blueprint stock costs $6 and includes four deck jobs plus Dividend, Supply Parcel, Side Pocket and Ticket Roll. Oddity stock costs $8 and appears in 16% of ordinary shops and 33% of boss shops. This is an initial tuning pass intended for further player feedback, not a claim of simulation-proven balance.
+## Pack stock — version 1.6
+
+Each shop generates exactly two independent pack offers. Tile and Blueprint each have 46% of each ordinary shop slot, with Oddity at 8%. After a boss, the split is 42% / 42% / 16%. Neither common family is guaranteed, duplicate families are possible, and rerolling the charm/item shop does not replace pack stock.
+
+Sizes are rolled separately: 76% Standard, 20% Large, 4% Deluxe. Standard means 3 choices / 1 pick, Large 5 choices / 1 pick, Deluxe 5 choices / 2 picks. Oddity choice counts stop at its four distinct effects. Each selected option is consumed; a second Deluxe pick must be different. Target selection can be canceled back to the same paid choices. Skipping forfeits any remaining picks.
+
+Tile and Blueprint cost $6 / $8 / $11 by size. Oddity costs $8 / $10 / $14. No automatic replacement or second-purchase price inflation. Print Shop adds one choice to any Tile pack and reduces its cost by $1. Deck-space and item-capacity limits still apply, including between Deluxe picks.
+
+This is an initial tuning pass intended for player feedback. Automated and browser tests were not run for the stock revision, per the user's request.

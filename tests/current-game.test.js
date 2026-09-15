@@ -11,7 +11,7 @@ const exports = `
 window.gameTest = {
   get state(){ return S; }, get telemetry(){ return T; }, get deckJob(){ return deckJob; },
   newRun, move, slide, score, packValue, unlockedPackValues, markMadeValue,
-  openShop, openPack, openJobPack, beginDeckJob, applyDeckJob, render, syncTiles,
+  openShop, openPack, openJobPack, renderPacks, renderJobPack, beginDeckJob, applyDeckJob, render, syncTiles,
   WORKSHOP, EXPERIMENTS, CHARMS, REACTIONS, makeCharm, mulberry, hashStr
 };
 `;
@@ -76,6 +76,8 @@ function createGame(t) {
   function shop() {
     game.state.money = 40;
     game.openShop();
+    game.state.packs=[{slot:0,kind:'workshop',size:'standard',sold:false},{slot:1,kind:'tile',size:'standard',sold:false}];
+    game.renderPacks();
   }
   function optionNames() {
     return [...$('packgrid').querySelectorAll('.nm')].map(node => node.textContent);
@@ -171,38 +173,44 @@ test('skipping a job pack forfeits its price and cannot reroll its offers for fr
   const originalRng = game.state.rng;
   let rngCalls = 0;
   game.state.rng = () => {rngCalls++; return originalRng();};
-  game.openJobPack('workshop', 6);
+  game.openJobPack(game.state.packs[0]);
   const options = optionNames();
   const callsAfterOpen = rngCalls;
   assert.equal(game.state.money, 34);
   assert.equal(options.length, 3);
   $('btnpackskip').click();
   assert.equal(game.state.money, 34);
-  assert.equal(game.state.workshopPack.sold, true);
+  assert.equal(game.state.packs[0].sold, true);
   assert.equal(game.state.pendingJobPack, null);
   $('btnpackskip').click();
   assert.equal(game.state.money, 34, 'Closing never refunds the gamble');
-  game.openJobPack('workshop', 6);
+  game.openJobPack(game.state.packs[0]);
   assert.equal($('ov-pack').classList.contains('show'), false, 'A discarded job pack is sold for this shop');
   assert.equal(rngCalls, callsAfterOpen, 'Discarded packs cannot generate new random choices');
   assert.equal(game.state.money, 34);
 });
 
-test('skipping a tile pack keeps its cost and the next pack costs more', t => {
+test('skipping a tile pack spends its slot and leaves the other offer at its listed price', t => {
   const {game, $, shop} = createGame(t);
   shop();
+  game.state.packs[0].kind='tile';
+  game.renderPacks();
   const originalDeck = JSON.stringify(game.state.deck);
-  game.openPack(6);
+  game.openPack(game.state.packs[1]);
   assert.equal(game.state.money, 34);
   $('btnpackskip').click();
   assert.equal(game.state.money, 34);
-  assert.equal(game.state.packCount, 1);
-  assert.equal(game.state.pendingPackPrice, null);
+  assert.equal(game.state.packs[1].sold, true);
+  assert.equal(game.state.pendingTilePack, null);
   assert.equal(JSON.stringify(game.state.deck), originalDeck);
-  assert.match($('deckrow').querySelector('.buy').textContent, /9/);
-  $('deckrow').querySelector('.buy').click();
-  assert.equal(game.state.money, 25);
-  assert.equal(game.state.packCount, 2);
+  assert.equal($('packstock').children.length, 2);
+  assert.match($('packstock').querySelector('.buy').textContent, /6/);
+  $('packstock').querySelector('.buy').click();
+  assert.equal(game.state.money, 28);
+  assert.ok(game.state.packs.every(p=>p.sold));
+  $('btnpackskip').click();
+  game.openPack(game.state.packs[1]);
+  assert.equal(game.state.money, 28);
 });
 
 test('canceling a pack deck edit returns to its choices and keeps its paid credit', t => {
@@ -210,8 +218,9 @@ test('canceling a pack deck edit returns to its choices and keeps its paid credi
   shop();
   // Guarantee a targeted choice so this test is about editor cancellation;
   // instant-use utility options have no tile editor to cancel.
-  game.state.workshopPack.options = game.WORKSHOP.filter(item => item.count > 0).slice(0, 3);
-  game.openJobPack('workshop', 6);
+  game.openJobPack(game.state.packs[0]);
+  game.state.pendingJobPack.options = game.WORKSHOP.filter(item => item.count > 0).slice(0, 3);
+  game.renderJobPack();
   const options = optionNames();
   $('packgrid').querySelector('button:not(:disabled)').click();
   assert.ok(game.deckJob);
@@ -227,7 +236,7 @@ test('canceling a pack deck edit returns to its choices and keeps its paid credi
   $('btneditapply').click();
   assert.equal(game.state.money, 34, 'Applying the chosen job must not charge a second price');
   assert.equal(game.state.pendingJobPack, null);
-  assert.equal(game.state.workshopPack.sold, true);
+  assert.equal(game.state.packs[0].sold, true);
   const deckAfter = JSON.stringify(game.state.deck);
   $('btneditapply').click();
   assert.equal(JSON.stringify(game.state.deck), deckAfter, 'A job applies only once');
@@ -237,8 +246,9 @@ test('canceling a pack deck edit returns to its choices and keeps its paid credi
 test('Escape returns an unfinished edit to its pack, then discards the pack without a refund', t => {
   const {game, $, shop, window, optionNames} = createGame(t);
   shop();
-  game.state.workshopPack.options = game.WORKSHOP.filter(item => item.count > 0).slice(0, 3);
-  game.openJobPack('workshop', 6);
+  game.openJobPack(game.state.packs[0]);
+  game.state.pendingJobPack.options = game.WORKSHOP.filter(item => item.count > 0).slice(0, 3);
+  game.renderJobPack();
   const options = optionNames();
   $('packgrid').querySelector('button:not(:disabled)').click();
   $('board').dispatchEvent(new window.KeyboardEvent('keydown', {key: 'Escape', bubbles: true}));
@@ -248,7 +258,7 @@ test('Escape returns an unfinished edit to its pack, then discards the pack with
   $('board').dispatchEvent(new window.KeyboardEvent('keydown', {key: 'Escape', bubbles: true}));
   assert.equal($('ov-pack').classList.contains('show'), false);
   assert.equal(game.state.pendingJobPack, null);
-  assert.equal(game.state.workshopPack.sold, true);
+  assert.equal(game.state.packs[0].sold, true);
   assert.equal(game.state.money, 34);
 });
 
@@ -257,8 +267,9 @@ test('workshop utility choices charge only the pack price and deliver their stat
   for (const def of game.WORKSHOP.filter(item => item.count === 0)) {
     game.newRun('utility-' + def.kind);
     shop();
-    game.state.workshopPack.options = [def];
-    game.openJobPack('workshop', 6);
+    game.openJobPack(game.state.packs[0]);
+    game.state.pendingJobPack.options = [def];
+    game.renderJobPack();
     $('packgrid').querySelector('button').click();
     assert.equal($('btneditapply').disabled, false, def.name);
     $('btneditapply').click();
