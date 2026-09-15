@@ -1,6 +1,6 @@
 (function(){
 "use strict";
-const VERSION="1.6";
+const VERSION="1.6.1";
 const STORAGE = new URLSearchParams(location.search).has("qa") ? "ante2048.qa." : "ante2048.";
 const escapeHTML = s => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]);
 const $ = id => document.getElementById(id);
@@ -881,7 +881,7 @@ const WORKSHOP=[
  {id:'trim',kind:'remove',name:'Trim',ico:'−',price:3,count:2,desc:'Remove up to 2 tiles. Keep at least 12 in your deck.'},
  {id:'recast',kind:'replace',name:'Recast',ico:'⇒',price:5,count:2,desc:'Choose a template, then turn another tile into an exact copy.'},
  {id:'duplicate',kind:'clone',name:'Duplicate',ico:'Ⅱ',price:5,count:1,desc:'Add a copy of a tile, including its enhancement. Needs a free deck slot.'},
- {id:'stamp',kind:'stamp',name:'Stamp',ico:'✦',price:6,count:1,desc:'Choose an enhancement for one tile in your deck.'},
+ ...Object.entries(ENH).map(([stamp,enh])=>({id:'blueprint_'+stamp,kind:'stamp',name:enh.name+' Blueprint',ico:enh.ico,count:1,stamp,desc:'Give one deck tile '+enh.name+'. '+enh.desc})),
  {id:'dividend',kind:'dividend',name:'Dividend',ico:'$+',count:0,desc:'Gain $1 for every $2 you hold after buying this pack, up to $12.'},
  {id:'parcel',kind:'parcel',name:'Supply Parcel',ico:'▧',count:0,desc:'Receive two different board tools. Needs two empty item slots.'},
  {id:'pocket',kind:'pocket',name:'Side Pocket',ico:'⊔',count:0,desc:'Carry one extra item for the rest of this run. Maximum 5 slots.'},
@@ -958,8 +958,8 @@ function renderDeckJob(){
   const need=d.count||(d.kind==='replace'?2:1);
   $('editstep').textContent=d.kind==='replace'?(picks.length===0?'1 / Choose the tile to copy.':picks.length===1?'2 / Choose the tile to replace.':'Review your conversion.'):
     'Choose '+(d.kind==='remove'?'up to ':'')+need+' tile'+(need>1?'s':'')+' · '+picks.length+' selected';
-  const enh=$('editenh');enh.innerHTML='';enh.hidden=d.kind!=='stamp';
-  if(d.kind==='stamp')Object.entries(ENH).forEach(([id,e])=>{
+  const enh=$('editenh');enh.innerHTML='';enh.hidden=d.kind!=='stamp'||!!d.stamp;
+  if(d.kind==='stamp'&&!d.stamp)Object.entries(ENH).forEach(([id,e])=>{
     const button=document.createElement('button');button.className='enh-choice'+(job.enh===id?' selected':'');
     button.setAttribute('aria-pressed',String(job.enh===id));button.innerHTML='<b>'+e.ico+' '+e.name+'</b><span>'+e.desc+'</span>';
     button.onclick=()=>{job.enh=id;renderDeckJob();};enh.appendChild(button);
@@ -1012,7 +1012,7 @@ function applyDeckJob(){
   else if(d.kind==='replace')S.deck[indices[1]]={...cards[0]};
   else if(d.kind==='remove')indices.slice().sort((a,b)=>b-a).forEach(i=>S.deck.splice(i,1));
   else if(d.kind==='clone')S.deck.push({...cards[0]});
-  else if(d.kind==='stamp')S.deck[indices[0]].enh=job.enh;
+  else if(d.kind==='stamp')S.deck[indices[0]].enh=d.stamp||job.enh;
   else if(d.kind==='promote')S.deck[indices[0]].v*=2;
   else if(d.kind==='random'){const keys=Object.keys(ENH);S.deck[indices[0]].enh=keys[Math.floor(S.rng()*keys.length)];}
   else if(d.kind==='kiln'){indices.forEach(i=>S.deck[i].enh='glass');S.bonusMoves-=2;S.kilnUses=(S.kilnUses||0)+1;}

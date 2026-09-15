@@ -17,3 +17,5 @@ Sizes are rolled separately: 76% Standard, 20% Large, 4% Deluxe. Standard means 
 Tile and Blueprint cost $6 / $8 / $11 by size. Oddity costs $8 / $10 / $14. No automatic replacement or second-purchase price inflation. Print Shop adds one choice to any Tile pack and reduces its cost by $1. Deck-space and item-capacity limits still apply, including between Deluxe picks.
 
 This is an initial tuning pass intended for player feedback. Automated and browser tests were not run for the stock revision, per the user's request.
+
+The generic choose-any-finish Stamp is replaced by six separate enhancement blueprints in 1.6.1: Kick, Plus, Prism, Iron, Brass and Odds. Each uses a fixed finish; the player chooses only the target tile. Named stamp consumables likewise stay bound to their stated finish.

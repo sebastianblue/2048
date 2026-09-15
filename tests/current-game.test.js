@@ -84,7 +84,7 @@ function createGame(t) {
   }
   function selectJobTiles() {
     const job = game.deckJob;
-    if (job.def.kind === 'stamp') $('editenh').querySelector('button').click();
+    if (job.def.kind === 'stamp' && !job.def.stamp) $('editenh').querySelector('button').click();
     const count = job.def.kind === 'remove' ? 1 : job.def.count || 1;
     for (let i = 0; i < count; i++) $('editgrid').querySelector('button:not(.selected):not(:disabled)').click();
   }
