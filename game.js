@@ -1,6 +1,6 @@
 (function(){
 "use strict";
-const VERSION="1.5";
+const VERSION="1.6";
 const STORAGE = new URLSearchParams(location.search).has("qa") ? "ante2048.qa." : "ante2048.";
 const escapeHTML = s => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]);
 const $ = id => document.getElementById(id);
@@ -218,7 +218,7 @@ const VOUCHERS=[
  {id:"pockets",ico:"+1",name:"Deep Pockets",price:8,desc:"One more consumable slot.",max:1,apply:()=>{S.maxCons++;}},
  {id:"coupon",ico:"−$2",name:"Coupon Book",price:6,desc:"Rerolls cost $2 less.",max:1,apply:()=>{S.rerollDisc+=2;}},
  {id:"headstart",ico:"×2",name:"Head Start",price:10,desc:"Both of your opening tiles start doubled each round.",max:1,apply:()=>{}},
- {id:"printer",ico:"Ⅳ",name:"Print Shop",price:8,desc:"Tile packs offer 4 cards instead of 3, and cost $1 less.",max:1,apply:()=>{S.packSize=4;S.packDisc=1;}},
+ {id:"printer",ico:"Ⅳ",name:"Print Shop",price:8,desc:"Tile packs offer one extra card and cost $1 less.",max:1,apply:()=>{S.packSize=4;S.packDisc=1;}},
  {id:"occult",ico:"+1",name:"Supply Line",price:9,desc:"One extra consumable offered in every shop.",max:1,apply:()=>{}},
 ];
 const BOSSES=[
@@ -694,13 +694,10 @@ function rollShop(){
 }
 function openShop(){
   audio.setScene("shop");
-  S.workshopUsed=false; S.backroomUsed=false; S.backroomOffers=null;
-  S.workshopPack={sold:false};
-  // Oddity packs are a rare sight in regular shops and more likely after a boss.
-  S.backroomPack=S.rng()<(S.blind===2?0.33:0.16)?{sold:false}:null;
-  S.pendingJobPack=null; S.pendingPackPrice=null; S.tilePacks=[];
-  S.phase="shop"; S.rerollCost=Math.max(1,5-S.rerollDisc); S.freeReroll=has("chaos"); rollShop(); pickVoucher(); S.packCount=0;
-  T.shops.push({afterAnte:S.ante,afterBlind:BLINDS[S.blind].name,money:S.money,offered:S.shop.map(i=>i.def.id).concat(S.voucher?["v:"+S.voucher.def.id]:[]).concat(["blueprint_pack"]).concat(S.backroomPack?["oddity_pack"]:[]),bought:[],sold:[],rerolls:0});
+  S.pendingJobPack=null; S.pendingTilePack=null;
+  S.phase="shop"; S.rerollCost=Math.max(1,5-S.rerollDisc); S.freeReroll=has("chaos"); rollShop(); pickVoucher();
+  S.packs=rollPacks();
+  T.shops.push({afterAnte:S.ante,afterBlind:BLINDS[S.blind].name,money:S.money,offered:S.shop.map(i=>i.def.id).concat(S.voucher?["v:"+S.voucher.def.id]:[]).concat(S.packs.map(p=>'pack:'+p.kind+':'+p.size)),bought:[],sold:[],rerolls:0});
   const nb=S.blind+1>2?0:S.blind+1, na=nb===0?S.ante+1:S.ante;
   $("shopnext").innerHTML="Next: <b>Ante "+na+" · "+BLINDS[nb].name+"</b>, target "+fmt(targetFor(na,nb))+".";
   renderShop(); show("ov-shop");
@@ -719,42 +716,81 @@ function renderVoucher(){
   el.querySelector(".buy").onclick=()=>{ if(v.sold||S.money-d.price<moneyFloor()) return; S.money-=d.price; v.sold=true; S.vouchers.push(d.id); d.apply(); curShop().bought.push("v:"+d.id); audio.effect("buy"); log("Voucher: <b>"+d.name+"</b>."); renderShop(); };
   box.appendChild(el);
 }
-function renderDeckShop(){
-  $("shopdeck").textContent=S.deck.length+" cards · "+deckSummary();
-  const row=$("deckrow"); row.innerHTML="";
-  const packPrice=Math.max(1,6-S.packDisc)+3*S.packCount;
-  const a=document.createElement("div"); a.className="card";
-  const finds=unlockedPackValues().filter(v=>v>4);
-  const findNote=finds.length?" Rare finds this run: "+finds.join(", ")+".":"";
-  a.innerHTML="<div class='ico'>Ⅱ</div><div style='flex:1'><div class='t'>Tile pack</div><div class='d'>Pick 1 of "+S.packSize+" cards to add to your deck. Each pack this shop costs $3 more. Values you have made can rarely appear here."+findNote+"</div></div><button class='buy' "+(S.deck.length>=DECK_CAP||S.money-packPrice<moneyFloor()?"disabled":"")+">Open $"+packPrice+"</button>";
-  a.querySelector(".buy").onclick=()=>openPack(packPrice); row.appendChild(a);
+const PACK_TYPES={
+  tile:{name:'Tile',mark:'Ⅱ',price:6,desc:'Add tiles to your deck. Higher values must be made on the board first.'},
+  workshop:{name:'Blueprint',mark:'✦',price:6,desc:'Deck work, supplies, cash and upgrades for the run.'},
+  backroom:{name:'Oddity',mark:'◇',price:8,desc:'Experimental deck edits with stronger effects and tradeoffs.'},
+};
+const PACK_SIZES={
+  standard:{name:'',cards:3,picks:1,extra:0},
+  large:{name:'Large',cards:5,picks:1,extra:2},
+  deluxe:{name:'Deluxe',cards:5,picks:2,extra:5},
+};
+function rollPacks(){
+  return Array.from({length:2},(_,slot)=>{
+    const rareChance=S.blind===2 ? .16 : .08;
+    const typeRoll=S.rng(),sizeRoll=S.rng();
+    const kind=typeRoll<rareChance?'backroom':typeRoll<rareChance+(1-rareChance)/2?'tile':'workshop';
+    const size=sizeRoll<.76?'standard':sizeRoll<.96?'large':'deluxe';
+    return {slot,kind,size,sold:false};
+  });
 }
-function openPack(price){
-  if(S.deck.length>=DECK_CAP||S.money-price<moneyFloor()) return;
-  S.money-=price; S.packCount++; S.pendingPackPrice=price; curShop().bought.push("pack");
-  $("btnpackskip").textContent="Skip pack";
-  $("packtitle").textContent="Tile pack"; $("packnote").textContent="Pick one card to keep. Opened packs cannot be refunded.";
-  const packIndex=S.packCount-1;
-  const opts=S.tilePacks[packIndex]||[]; const enhKeys=Object.keys(ENH);
-  for(let i=opts.length;i<S.packSize;i++){
-    const v=packValue();
-    const enh = S.rng()<0.6 ? enhKeys[Math.floor(S.rng()*enhKeys.length)] : null;
-    opts.push({v,enh});
-  }
-  S.tilePacks[packIndex]=opts;
-  const g=$("packgrid"); g.innerHTML="";
-  opts.forEach(o=>{
-    const el=document.createElement("button"); el.className="opt";
-    el.innerHTML="<div class='mini' data-v='"+o.v+"' data-enh='"+(o.enh||'')+"'>"+o.v+(o.enh?"<span class='eb'>"+ENH[o.enh].ico+"</span>":"")+"</div><div class='nm'>"+(o.enh?ENH[o.enh].name+" ":"")+o.v+"</div><div class='ds'>"+(o.enh?ENH[o.enh].desc:"A plain "+o.v+".")+"</div>";
-    el.onclick=()=>{ const before=deckSummary(); S.pendingPackPrice=null; S.deck.push({v:o.v,enh:o.enh}); recordDeckEdit("tile_pack",before,deckSummary()); S.pile.splice(Math.floor(S.rng()*(S.pile.length+1)),0,{v:o.v,enh:o.enh}); curShop().bought.push("card:"+(o.enh||"")+o.v); audio.effect("upgrade"); log("Added "+(o.enh?ENH[o.enh].name+" ":"")+"<b>"+o.v+"</b> to the deck."); hide("ov-pack"); renderShop(); };
+function packName(pack){return [PACK_SIZES[pack.size].name,PACK_TYPES[pack.kind].name,'pack'].filter(Boolean).join(' ');}
+function packPrice(pack){return Math.max(1,PACK_TYPES[pack.kind].price+PACK_SIZES[pack.size].extra+(pack.kind==='backroom'&&pack.size==='deluxe'?1:0)-(pack.kind==='tile'?S.packDisc:0));}
+function packCardCount(pack){
+  const count=PACK_SIZES[pack.size].cards;
+  return pack.kind==='tile'?count+Math.max(0,S.packSize-3):Math.min(count,(pack.kind==='workshop'?WORKSHOP:EXPERIMENTS).length);
+}
+function canOpenPack(pack){return S.phase==='shop'&&S.packs.includes(pack)&&!pack.sold&&!S.pendingTilePack&&!S.pendingJobPack&&S.money-packPrice(pack)>=moneyFloor();}
+function renderPacks(){
+  $('shopdeck').textContent='Deck: '+S.deck.length+' / '+DECK_CAP+' tiles';
+  const row=$('packstock');row.innerHTML='';
+  S.packs.forEach(pack=>{
+    const type=PACK_TYPES[pack.kind],size=PACK_SIZES[pack.size];
+    const full=pack.kind==='tile'&&S.deck.length>=DECK_CAP;
+    const card=document.createElement('div');card.className='card con pack-stock-card'+(pack.sold?' sold':'');card.dataset.packKind=pack.kind;card.dataset.packSize=pack.size;
+    const count=packCardCount(pack);
+    card.innerHTML='<div style="display:flex;gap:10px;align-items:flex-start;width:100%"><div class="ico">'+type.mark+'</div><div><div class="t">'+packName(pack)+'</div><div class="d">'+type.desc+'</div></div></div><div class="pack-contents">Choose '+size.picks+' of '+count+'</div><span class="rare '+(pack.kind==='backroom'?'r':'')+'">'+(pack.kind==='backroom'?'rare · ':'')+(size.name||'standard')+'</span><button class="buy" '+(pack.sold||full||S.money-packPrice(pack)<moneyFloor()?'disabled':'')+'>'+(pack.sold?'Opened':full?'Deck full':'Open $'+packPrice(pack))+'</button>';
+    card.querySelector('.buy').onclick=()=>pack.kind==='tile'?openPack(pack):openJobPack(pack);
+    row.appendChild(card);
+  });
+}
+function openPack(pack){
+  if(!canOpenPack(pack)||S.deck.length>=DECK_CAP)return;
+  const price=packPrice(pack),enhKeys=Object.keys(ENH);
+  const options=Array.from({length:packCardCount(pack)},()=>({v:packValue(),enh:S.rng()<.6?enhKeys[Math.floor(S.rng()*enhKeys.length)]:null}));
+  S.money-=price;pack.sold=true;
+  S.pendingTilePack={pack,price,options,remaining:PACK_SIZES[pack.size].picks,taken:[]};
+  curShop().bought.push('pack:tile:'+pack.size);
+  renderShop();renderTilePack();juice?.pack($('packgrid'),packName(pack).toUpperCase());audio.effect('pack');saveT();
+}
+function renderTilePack(){
+  const pending=S.pendingTilePack,{pack,options,taken,remaining}=pending;
+  $('packtitle').textContent=packName(pack);
+  $('packnote').textContent='Choose '+remaining+' more. '+(DECK_CAP-S.deck.length)+' deck slots free. Opened packs cannot be refunded.';
+  $('btnpackskip').textContent=taken.length?'Leave the rest':'Skip pack';
+  const g=$('packgrid');g.innerHTML='';g.classList.toggle('expanded',options.length>3);
+  options.forEach((o,index)=>{
+    const used=taken.includes(index),el=document.createElement('button');el.className='opt'+(used?' taken':'');el.disabled=used||S.deck.length>=DECK_CAP;
+    el.innerHTML="<div class='mini' data-v='"+o.v+"' data-enh='"+(o.enh||'')+"'>"+o.v+(o.enh?"<span class='eb'>"+ENH[o.enh].ico+"</span>":'')+"</div><div class='nm'>"+(o.enh?ENH[o.enh].name+' ':'')+o.v+"</div><div class='ds'>"+(used?'Taken':o.enh?ENH[o.enh].desc:'A plain '+o.v+'.')+'</div>';
+    el.onclick=()=>{
+      if(S.pendingTilePack!==pending||taken.includes(index)||S.deck.length>=DECK_CAP)return;
+      const before=deckSummary();taken.push(index);pending.remaining--;
+      S.deck.push({v:o.v,enh:o.enh});recordDeckEdit('tile_pack',before,deckSummary());
+      S.pile.splice(Math.floor(S.rng()*(S.pile.length+1)),0,{v:o.v,enh:o.enh});
+      curShop().bought.push('card:'+(o.enh||'')+o.v);audio.effect('upgrade');log('Added '+(o.enh?ENH[o.enh].name+' ':'')+'<b>'+o.v+'</b> to the deck.');
+      if(!pending.remaining){S.pendingTilePack=null;hide('ov-pack');}else renderTilePack();
+      renderShop();saveT();
+    };
     g.appendChild(el);
   });
-  renderShop(); show("ov-pack"); juice?.pack($("packgrid"),"TILE PACK"); audio.effect("pack");
+  show('ov-pack');
 }
-$("btnpackskip").onclick=()=>{
-  if(S.pendingPackPrice){curShop().bought.push('tile_pack_skipped');S.pendingPackPrice=null;}
-  if(S.pendingJobPack){curShop().bought.push(S.pendingJobPack.kind+'_pack_skipped');S.pendingJobPack=null;}
-  hide('ov-pack'); renderShop(); saveT();
+$('btnpackskip').onclick=()=>{
+  const pending=S.pendingTilePack||S.pendingJobPack;
+  if(pending)curShop().bought.push('pack_skipped:'+pending.pack.kind+':'+pending.remaining);
+  S.pendingTilePack=null;S.pendingJobPack=null;
+  hide('ov-pack');renderShop();saveT();
 };
 function renderShop(){
   $("shopwallet").textContent="$"+S.money;
@@ -769,7 +805,7 @@ function renderShop(){
     el.querySelector(".buy").onclick=()=>buy(i);
     $("shopgrid").appendChild(el);
   });
-  renderDeckShop(); renderVoucher(); renderWorkshop();
+  renderPacks(); renderVoucher();
   const rc=S.freeReroll||S.rerollTickets>0?0:S.rerollCost;
   $("btnreroll").textContent=rc?"Reroll $"+rc:"Reroll (free)"+(S.rerollTickets>0?" · "+S.rerollTickets+" tickets":""); $("btnreroll").disabled=S.money-rc<moneyFloor();
   $("shopcharms").innerHTML="";
@@ -840,8 +876,7 @@ function finishCon(i){
   if(!canMove()) afterMove({total:0,steps:[]});
 }
 // ---------- permanent deck work ----------
-// Special stock is offered as consumable-style packs. Each pack opens a
-// small, paid choice of deck edits and can be opened once per shop.
+// Pack contents are used immediately; a Deluxe pack has two separate picks.
 const WORKSHOP=[
  {id:'trim',kind:'remove',name:'Trim',ico:'−',price:3,count:2,desc:'Remove up to 2 tiles. Keep at least 12 in your deck.'},
  {id:'recast',kind:'replace',name:'Recast',ico:'⇒',price:5,count:2,desc:'Choose a template, then turn another tile into an exact copy.'},
@@ -876,53 +911,35 @@ function editReason(d){
   if(d.kind==='split'&&!S.deck.some(c=>c.v>=4)) return 'Needs a tile of 4 or more';
   return '';
 }
-function openJobPack(kind,price){
-  const pack=kind==='workshop'?S.workshopPack:S.backroomPack;
-  if(!pack||pack.sold||S.money-price<moneyFloor()) return;
-  if(!pack.options){
-    const pool=(kind==='workshop'?WORKSHOP:EXPERIMENTS).slice();
-    for(let i=pool.length-1;i>0;i--){ const j=Math.floor(S.rng()*(i+1)); [pool[i],pool[j]]=[pool[j],pool[i]]; }
-    pack.options=pool.slice(0,3);
-  }
-  S.money-=price; pack.sold=true; S.pendingJobPack={kind,price,options:pack.options};
-  curShop().bought.push(kind+'_pack');
-  audio.effect('pack');
-  renderJobPack(); juice?.pack($('packgrid'),kind==='workshop'?'BLUEPRINT':'ODDITY');
+function openJobPack(pack){
+  if(!canOpenPack(pack))return;
+  const pool=(pack.kind==='workshop'?WORKSHOP:EXPERIMENTS).slice();
+  for(let i=pool.length-1;i>0;i--){const j=Math.floor(S.rng()*(i+1));[pool[i],pool[j]]=[pool[j],pool[i]];}
+  const price=packPrice(pack);
+  S.money-=price;pack.sold=true;
+  S.pendingJobPack={pack,kind:pack.kind,price,options:pool.slice(0,packCardCount(pack)),remaining:PACK_SIZES[pack.size].picks,taken:[]};
+  curShop().bought.push('pack:'+pack.kind+':'+pack.size);audio.effect('pack');
+  renderShop();renderJobPack();juice?.pack($('packgrid'),packName(pack).toUpperCase());saveT();
 }
 function renderJobPack(){
-  const {kind,price,options}=S.pendingJobPack;
+  const pending=S.pendingJobPack,{pack,kind,options,taken,remaining}=pending;
   const source=kind==='workshop'?'workshop-pack':'backroom-pack';
-  $('packtitle').textContent=kind==='workshop'?'Blueprint pack':'Oddity pack';
-  $('packnote').textContent='Choose one. The price includes the effect. Opened packs cannot be refunded.';
-  const g=$('packgrid'); g.innerHTML='';
+  $('packtitle').textContent=packName(pack);
+  $('packnote').textContent='Choose '+remaining+' more. Effects are included in the price. No refunds.';
+  const g=$('packgrid');g.innerHTML='';g.classList.toggle('expanded',options.length>3);
   options.forEach(d=>{
-    const el=document.createElement('button'); el.className='opt job-opt';
-    const reason=editReason(d);
-    el.innerHTML='<div class="job-opt-mark">'+d.ico+'</div><div class="nm">'+d.name+'</div><div class="ds">'+d.desc+'</div><small class="pack-tag">'+(reason||(kind==='workshop'?'WORKSHOP':'BACKROOM'))+'</small>';
-    el.disabled=!!reason;
-    el.onclick=()=>{ hide('ov-pack'); beginDeckJob(d,{source,price:0}); };
+    const used=taken.includes(d.id),reason=editReason(d),el=document.createElement('button');el.className='opt job-opt'+(used?' taken':'');
+    el.innerHTML='<div class="job-opt-mark">'+d.ico+'</div><div class="nm">'+d.name+'</div><div class="ds">'+d.desc+'</div><small class="pack-tag">'+(used?'Used':reason||(kind==='workshop'?'WORKSHOP':'BACKROOM'))+'</small>';
+    el.disabled=used||!!reason;
+    el.onclick=()=>{if(S.pendingJobPack!==pending||taken.includes(d.id))return;hide('ov-pack');beginDeckJob(d,{source,price:0});};
     g.appendChild(el);
   });
-  $('btnpackskip').textContent='Skip pack';
+  $('btnpackskip').textContent=taken.length?'Leave the rest':'Skip pack';
   show('ov-pack');
 }
 function cancelDeckJob(){
-  deckJob=null; hide('ov-deckedit');
+  deckJob=null;hide('ov-deckedit');
   if(S.pendingJobPack)renderJobPack();
-}
-function renderWorkshop(){
-  const row=$('workshoprow'); row.innerHTML='';
-  $('workshopnote').textContent=S.workshopUsed?'Job used this shop':'One pack of each type per shop';
-  const addPack=(kind,pack,title,desc,price,mark,rare)=>{
-    if(!pack) return;
-    const afford=S.money-price>=moneyFloor();
-    const card=document.createElement('div'); card.className='card con'+(pack.sold?' sold':'');
-    card.innerHTML='<div style="display:flex;gap:10px;align-items:flex-start;width:100%"><div class="ico">'+mark+'</div><div><div class="t">'+title+'</div><div class="d">'+desc+'</div></div></div><span class="rare '+(rare?'r':'')+'">'+(rare?'rare':'special')+'</span><button class="buy" '+(pack.sold||!afford?'disabled':'')+'>'+(pack.sold?'Opened':'Open $'+price)+'</button>';
-    card.querySelector('.buy').onclick=()=>openJobPack(kind,price);
-    row.appendChild(card);
-  };
-  addPack('workshop',S.workshopPack,'Blueprint pack','Choose 1 of 3: deck work, supplies, cash or run upgrades.',6,'✦',false);
-  addPack('backroom',S.backroomPack,'Oddity pack','Choose 1 of 3 backroom jobs. Stronger edits, stranger costs.',8,'◇',true);
 }
 function beginDeckJob(def,options={}){
   const reason=editReason(def);if(reason){hint(reason,true);return;}
@@ -1003,9 +1020,10 @@ function applyDeckJob(){
   else if(d.kind==='split'){S.deck[indices[0]].v/=2;S.deck.push({...S.deck[indices[0]]});}
   else if(d.kind==='reforge')indices.forEach(i=>S.deck[i]={v:8,enh:null});
   S.money-=job.price;
-  if(job.source==='workshop'||job.source==='workshop-pack')S.workshopUsed=true;
-  if(job.source.endsWith('-pack'))S.pendingJobPack=null;
-  if(job.source==='backroom'||job.source==='backroom-pack'){S.backroomUsed=true;hide('ov-backroom');}
+  if(job.source.endsWith('-pack')){
+    S.pendingJobPack.taken.push(d.id);S.pendingJobPack.remaining--;
+    if(!S.pendingJobPack.remaining)S.pendingJobPack=null;
+  }
   if(job.source==='item'){
     S.cons.splice(job.idx,1);S.consUsed++;S.charms.forEach(c=>{if(c.onUseCon)c.onUseCon(c);});
     if(S.phase==='round')curRound().moves.push({con:d.id,deck:true});
@@ -1015,13 +1033,12 @@ function applyDeckJob(){
   else {S.consUsed++;S.charms.forEach(c=>{if(c.onUseCon)c.onUseCon(c);});}
   log('<b>'+d.name+'</b>: '+$('editpreview').textContent);
   deckJob=null;undoSnap=null;if(d.count!==0)reshuffle();hide('ov-deckedit');audio.effect('upgrade');
-  render();if(S.phase==='shop')renderShop();saveT();
+  render();if(S.phase==='shop')renderShop();if(S.pendingJobPack)renderJobPack();saveT();
 }
 function openDeckPick(i,d){
   const kinds={promote:'promote',twin:'clone',burn:'remove',temper:'random',recast_item:'replace',split_item:'split'};
   beginDeckJob({...d,kind:d.stamp?'stamp':kinds[d.id],count:d.id==='recast_item'?2:1},{source:'item',idx:i});
 }
-function showBackroom(){ openJobPack('backroom',8); }
 $('btneditapply').onclick=applyDeckJob;
 $('btneditcancel').onclick=cancelDeckJob;
 $('btnbackroomclose').onclick=()=>hide('ov-backroom');
