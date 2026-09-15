@@ -1,37 +1,53 @@
-# Double or Nothing
+# 2048: ANTE
 
-A complete browser-based 2048 roguelite. Plain HTML, CSS and JavaScript; no runtime package dependencies. The `dist/` directory is the authored deployable game.
+A sliding-tile roguelite by Sebastian. Build a deck of tiles, combine enhancements, collect charms, and beat eight antes of rising score targets.
 
-## Play
+**Play: https://sebastianblue.github.io/2048/**
 
-Run `npm start`, then open `http://127.0.0.1:4178/`. Use arrows, WASD, touch swipes or on-screen direction buttons. Equal tiles merge once per slide. Beat each round's score target before spending your moves. Shops appear between rounds; the twelfth round is the final boss.
+## Playing
 
-- 27 jokers, 10 consumable powerups, five joker slots, three powerup slots.
-- 12 rounds in four antes, four visible boss rules, four starting kits.
-- Standard, Easygoing and unlockable High Stakes modes; fixed daily seeds use UTC.
-- Device-local automatic saves, optional procedural sound, reduced motion, keyboard controls.
-- Hand-stamped house look: green felt, paper tickets, gold trim, and bold marker-like type make the table feel authored rather than templated.
-- Juicy feedback: moving ghost tiles, new-tile drop-ins, merge pops, spark bursts, score floaters, board flashes, score-panel pulses, shop/dialog motion, and distinct move/merge/power/shop/win/loss tones. Sound is on for new players, remembers the user's choice, and has a volume slider in Pause.
-- Joker rolls are keyed to the run seed, so wild outcomes are repeatable and rewinds stay fair. Foil, Mult, Lucky, and Glass stamps let you upgrade individual board tiles; each mark moves through slides and has a distinct payoff.
+Use arrow keys, WASD, swipe, or the direction buttons. A valid slide costs one move. Equal tiles merge once per move; merges score chips, while chains, charms and tile finishes build your multiplier. Reach the target and bank the round, or keep playing for extra cash.
 
-## Playtest logs
+Between rounds, buy charms, items, tile packs and permits. Blueprint packs contain deck edits, supplies, money and upgrades for the run. Rare Oddity packs contain experimental deck work with tradeoffs. **Opening any pack spends its price permanently.** You can skip its contents, but there are no refunds.
 
-The local server writes game events as JSON Lines under `playtests/YYYY-MM-DD.jsonl`. These files are ignored by Git and never deployed. Each event includes a run identifier, seed, timestamp, event type, before/after board state, score, moves, money, inventory and relevant score breakdown or shop action. Logging starts when the updated page is loaded; earlier moves cannot be reconstructed. An existing run is captured with a `resume` snapshot.
+Higher values can rarely appear in tile packs after you have made that exact value on the board during the current run. Larger numbers stay rarer. Six mixed-finish reactions reward setting up particular pairs; the rules sheet describes each one. Each pairing triggers at most once per move.
 
-Use **Feedback & logs** to attach a note to the current state or download the browser's recent events as JSON (up to 1,000 events or approximately 2.5 MB; local project logs retain all received events). Hosted play keeps logs in that browser for download; it does not send play data to a server. The local endpoint accepts only same-origin POSTs and caps request size. `?playtest` uses separate local storage and never writes to the user's local playtest files.
+The board resets each round; your deck, charms and purchased upgrades remain for the run. Music keeps its place between screens. Sound settings have separate music/effects sliders, a mute button and manual track selection. Reduced-motion settings are respected.
 
-## Checks
+## Local development
 
-`npm test`: 24 engine checks covering movement, conservation, joker math, tile upgrades, all bosses, shop restrictions, economy, powerups, recovery, deterministic replay, saves and a complete winning run.
+Requires a recent Node.js release (Node 22 or newer recommended).
 
-`npm run balance -- 500`: deterministic simulation with three policies. See `DESIGN.md` for the final results and limitations.
+```sh
+npm install
+npm start
+```
 
-## Files
+Open http://127.0.0.1:4178/. Use `?qa=1` to keep test-run history and sound preferences separate from your normal browser history.
 
-- `dist/engine.js`: pure deterministic rules and content definitions.
-- `dist/app.js`: UI, animation, audio, browser saves, playtest logging and optional WebMCP.
-- `dist/style.css`: responsive game and market styling.
-- `server.js`: local static server and local-only playtest collection.
-- `tests/`: invariant checks and balance simulations.
+The game is authored directly in `dist/`; there is no build step and no production dependency. `index.html` loads `game.js` (rules/UI), `audio.js` (music/sound) and `juice.js` (impact/reveal animations). `style.css` and local fonts provide the presentation. Legacy `engine.js`/`app.js` are retained for the earlier version and are not loaded by the current page.
 
-Research credits and their application are documented in `DESIGN.md` and the in-game Design notes.
+## Publishing
+
+GitHub Pages serves the root of the `gh-pages` branch. All asset URLs are relative so the game works under `/2048/`.
+
+```sh
+git add .
+git commit -m "Update the game"
+git push origin main
+npm run deploy
+```
+
+The publisher copies the committed `dist` tree into a new, ordinary commit on `gh-pages`. It preserves publishing history and refuses uncommitted game files. GitHub Pages publishes that branch automatically.
+
+## Run history and checks
+
+Run history is stored in the current browser. **Run history & export** downloads the most recent 25 runs as JSON for playtest discussion. The hosted game does not transmit gameplay logs to a server. Starting a new run does not resume unfinished play; exports are history, not saved-game files.
+
+`npm test` includes the current game's DOM interactions and scoring, audio scheduling/levels, and the older engine's regression suite. `npm run balance` targets the legacy engine; it does not establish balance for this edition.
+
+## Credits
+
+Based on 2048; inspired by Balatro. Music includes Sebastian Blue, Sebastian Blue ft. Juliana Aquino, and Apple iLife cues. Audio is leveled for the game; original recordings remain unchanged. Sound effects are generated specifically for the game. Typeface: Barlow by Jeremy Tribby.
+
+Music and other third-party assets retain their respective rights. See `reference/audio-notes.md` for audio provenance and calibration, and `reference/game-feel.md` for the animation approach.

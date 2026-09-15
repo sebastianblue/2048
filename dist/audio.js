@@ -7,14 +7,18 @@
  */
 window.AnteAudio = (() => {
   const trackDefs = [
-    { id: 'starlight', title: 'Starlight Lounge', mood: 'warm', rooms: ['title', 'round', 'shop'] },
-    { id: 'bossa', title: 'Bossa Lounger', mood: 'warm', rooms: ['title', 'round', 'shop'] },
-    { id: 'swing', title: 'Side Pocket Swing', mood: 'bright', rooms: ['round', 'shop'] },
-    { id: 'velvet', title: 'Velvet Switch', mood: 'low', rooms: ['round', 'boss'] },
-    { id: 'wildcard', title: 'Wildcard Shuffle', mood: 'bright', rooms: ['round', 'boss'] },
-    { id: 'fireside', title: 'After Hours', mood: 'warm', rooms: ['title', 'round', 'shop'] },
-    { id: 'headspin', title: 'Headspin', mood: 'low', rooms: ['boss', 'loss'] },
-    { id: 'highlight', title: 'House Lights', mood: 'bright', rooms: ['win', 'title', 'shop'] },
+    { id: 'starlight', gainDb: -6.32, title: 'Starlight Lounge', mood: 'warm', rooms: ['title', 'round', 'shop'] },
+    { id: 'bossa', gainDb: -5.84, title: 'Bossa Lounger', mood: 'warm', rooms: ['title', 'round', 'shop'] },
+    { id: 'swing', gainDb: -2.35, title: 'Side Pocket Swing', mood: 'bright', rooms: ['round', 'shop'] },
+    { id: 'velvet', gainDb: -4.76, title: 'Velvet Switch', mood: 'low', rooms: ['round', 'boss'] },
+    { id: 'wildcard', gainDb: -6.85, title: 'Wildcard Shuffle', mood: 'bright', rooms: ['round', 'boss'] },
+    { id: 'fireside', gainDb: -3.36, title: 'After Hours', mood: 'warm', rooms: ['title', 'round', 'shop'] },
+    { id: 'headspin', gainDb: -7.58, title: 'Headspin', mood: 'low', rooms: ['boss', 'loss'] },
+    { id: 'highlight', gainDb: -4.94, title: 'House Lights', mood: 'bright', rooms: ['win', 'title', 'shop'] },
+    { id: 'blue_mary', gainDb: -7.07, title: 'Mary Margaret Bounce', mood: 'bright', rooms: ['round', 'shop'] },
+    { id: 'blue_nitemare', gainDb: -0.25, title: 'Nitemare', mood: 'low', rooms: ['boss', 'loss', 'round'] },
+    { id: 'blue_not_afraid', gainDb: -0.01, title: 'Not Afraid', mood: 'warm', rooms: ['title', 'round', 'shop'] },
+    { id: 'blue_flores', gainDb: 1.9, title: 'Flores Árvores', mood: 'warm', rooms: ['title', 'shop', 'round'] },
   ];
   const tracks = trackDefs.map(track => track.id);
   const defaults = { music: 24, effects: 65, track: 'auto', muted: false };
@@ -33,7 +37,7 @@ window.AnteAudio = (() => {
   let musicGain;
   let effectsGain;
   let filter;
-  let ready;
+
   let musicTimer = null;
   let timerDue = null;
   let loadingNext = false;
@@ -48,7 +52,9 @@ window.AnteAudio = (() => {
   const requests = new Map();
   const voices = new Set();
   const lastEffect = new Map();
-  let lastClick = 0;
+  const effectBuffers = new Map();
+  const effectVoices = new Set();
+
 
   const status = message => {
     const node = document.getElementById('audiostatus');
@@ -61,10 +67,10 @@ window.AnteAudio = (() => {
     if (!AudioContext) return;
     context = new AudioContext();
     master = context.createGain();
-    master.gain.value = 0.65;
+    master.gain.value = 0;
     const limiter = context.createDynamicsCompressor();
-    limiter.threshold.value = -12;
-    limiter.knee.value = 12;
+    limiter.threshold.value = -4;
+    limiter.knee.value = 3;
     limiter.ratio.value = 6;
     limiter.attack.value = 0.003;
     limiter.release.value = 0.18;
@@ -91,6 +97,7 @@ window.AnteAudio = (() => {
       return response.arrayBuffer();
     }).then(data => context.decodeAudioData(data)).then(buffer => {
       buffers.set(name, buffer);
+      trimMusicBuffers(name);
       requests.delete(name);
       return buffer;
     }).catch(() => {
@@ -99,6 +106,12 @@ window.AnteAudio = (() => {
     });
     requests.set(name, request);
     return request;
+  }
+
+  function trimMusicBuffers(incoming) {
+    // Active sources own their buffers; keep only the current and next song cached.
+    const keep = new Set([incoming, ...[...voices].map(voice => voice.name)]);
+    for (const name of buffers.keys()) if (!keep.has(name)) buffers.delete(name);
   }
 
   function populateTrackControl() {
@@ -130,14 +143,13 @@ window.AnteAudio = (() => {
       return;
     }
     unlocked = true;
-    try { await context.resume(); } catch {
+    try { if (!paused && !document.hidden) await context.resume(); } catch {
       status('Tap Sound to enable audio.');
       return;
     }
     populateTrackControl();
-    ready ||= Promise.all(['switch', 'coin', 'ratchet', 'cash'].map(load));
     ensureMusic();
-    return ready;
+
   }
 
   function updateLevels() {
@@ -146,7 +158,8 @@ window.AnteAudio = (() => {
     const silent = prefs.muted || paused || document.hidden;
     const roomMusic = scene === 'shop' ? 0.72 : scene === 'boss' ? 0.54 : scene === 'win' ? 0.78 : 0.62;
     const roomFilter = scene === 'boss' ? 2300 : scene === 'shop' ? 5800 : scene === 'loss' ? 1800 : 7200;
-    master.gain.setTargetAtTime(silent ? 0 : 0.65, now, 0.07);
+    master.gain.cancelScheduledValues(now);
+    master.gain.setTargetAtTime(silent ? 0 : 0.72, now, 0.07);
     const energy = 0.72 + intensity * 0.28;
     musicGain.gain.setTargetAtTime((prefs.music / 100) * roomMusic * energy, now, 0.4);
     effectsGain.gain.setTargetAtTime(prefs.effects / 100, now, 0.03);
@@ -196,26 +209,37 @@ window.AnteAudio = (() => {
       musicTimer = null;
       if (generation !== musicGeneration || paused || document.hidden) return;
       timerDue = null;
-      queueTrackAt(Math.max(context.currentTime + 0.03, at), generation);
+      queueTrackAt(Math.max(context.currentTime + 0.03, at + 15), generation);
     }, wait);
   }
 
   function scheduleTrack(name, buffer, at, generation) {
-    if (!context || generation !== musicGeneration || paused || document.hidden) return;
+    if (!context || generation !== musicGeneration) return;
+    at = Math.max(at, context.currentTime + 0.03);
     const source = context.createBufferSource();
     const gain = context.createGain();
     source.buffer = buffer;
+    // A slow connection cannot leave a silent hole: hold the current song until
+    // the next has decoded, then schedule both sides of the same crossfade.
+    source.loop = true;
+    source.loopEnd = buffer.duration;
     source.connect(gain);
     gain.connect(musicGain);
     const fade = Math.min(2.5, Math.max(0.6, buffer.duration / 4));
-    const end = at + buffer.duration;
+    const level = 10 ** ((trackDefs.find(track => track.id === name)?.gainDb || 0) / 20);
+    const loopCount = buffer.duration < 90 ? Math.ceil(90 / buffer.duration) : 1;
+    const end = at + buffer.duration * loopCount;
+    for (const previous of voices) {
+      if (previous.ending) continue;
+      previous.ending = true;
+      previous.gain.gain.setValueAtTime(previous.level, at);
+      previous.gain.gain.linearRampToValueAtTime(0, at + fade);
+      previous.source.stop(at + fade + 0.02);
+    }
     gain.gain.setValueAtTime(0, at);
-    gain.gain.linearRampToValueAtTime(1, at + fade);
-    gain.gain.setValueAtTime(1, Math.max(at + fade, end - fade));
-    gain.gain.linearRampToValueAtTime(0, end);
+    gain.gain.linearRampToValueAtTime(level, at + fade);
     source.start(at);
-    source.stop(end + 0.02);
-    const voice = { source, gain, name, at, end };
+    const voice = { source, gain, name, at, end, level, ending: false };
     voices.add(voice);
     currentTrack = name;
     recentTracks = [name, ...recentTracks.filter(id => id !== name)].slice(0, 3);
@@ -223,8 +247,9 @@ window.AnteAudio = (() => {
       voices.delete(voice);
       gain.disconnect();
       source.disconnect();
+      trimMusicBuffers(currentTrack);
     };
-    armMusicTimer(end - fade, generation);
+    if (prefs.track === 'auto') armMusicTimer(end - fade - 15, generation);
   }
 
   async function queueTrackAt(at, generation) {
@@ -240,8 +265,8 @@ window.AnteAudio = (() => {
       const buffer = await load(candidate);
       if (buffer) { loaded = buffer; name = candidate; break; }
     }
+    if (generation !== musicGeneration) return;
     loadingNext = false;
-    if (generation !== musicGeneration || paused || document.hidden) return;
     if (!loaded) {
       timerDue = null;
       status('Music could not load. Effects are still available.');
@@ -274,59 +299,123 @@ window.AnteAudio = (() => {
     return true;
   }
 
-  function sample(name, level = 0.4, rate = 1) {
-    if (!context || !unlocked || prefs.muted || paused || document.hidden || !prefs.effects) return;
-    const buffer = buffers.get(name);
-    if (!buffer) return;
-    const source = context.createBufferSource();
-    const gain = context.createGain();
-    source.buffer = buffer;
-    source.playbackRate.value = rate;
-    gain.gain.value = level;
-    source.connect(gain);
-    gain.connect(effectsGain);
-    source.start();
-    source.onended = () => { source.disconnect(); gain.disconnect(); };
+  function effectsAllowed() {
+    return context && unlocked && !prefs.muted && !paused && !document.hidden && prefs.effects > 0;
   }
 
-  function tone(frequency = 440, duration = 0.12, level = 0.1) {
-    if (!context || !unlocked || prefs.muted || paused || document.hidden || !prefs.effects) return;
-    const now = context.currentTime;
-    const osc = context.createOscillator();
-    const gain = context.createGain();
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(frequency, now);
-    gain.gain.setValueAtTime(0, now);
-    gain.gain.linearRampToValueAtTime(level, now + 0.006);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
-    osc.connect(gain);
-    gain.connect(effectsGain);
-    osc.start(now);
-    osc.stop(now + duration + 0.01);
-    osc.onended = () => { osc.disconnect(); gain.disconnect(); };
+  function stopEffects() {
+    for (const voice of effectVoices) {
+      try { voice.stop(); } catch {}
+    }
+    effectVoices.clear();
+  }
+
+  // Short physical sounds: a felted body, pitched wooden modes, and a little
+  // surface noise. RMS targets keep their perceived weight consistent; a peak
+  // ceiling leaves room for simultaneous slide / merge / reaction feedback.
+  function makeEffect(name, value = 0) {
+    const presets = {
+      click: [.065, 440, -30, 'wood'], slide: [.10, 130, -31, 'brush'],
+      merge: [.19, 140, -25, 'impact'],
+      bump: [.13, 85, -28, 'wood'], score: [.23, 240, -25, 'wood'],
+      buy: [.24, 310, -26, 'pluck'], bank: [.48, 360, -25, 'chord'],
+      shuffle: [.24, 180, -29, 'brush'], pack: [.42, 160, -26, 'brush'], rubble: [.23, 75, -28, 'wood'],
+      boss: [.65, 86, -28, 'chord'], loss: [.62, 74, -29, 'chord'],
+      upgrade: [.40, 390, -25, 'pluck'], reaction: [.33, 330, -25, 'spring'],
+      win: [.72, 330, -25, 'chord'], tone: [.12, value || 440, -28, 'pluck'],
+    };
+    const preset = presets[name];
+    if (!preset) return null;
+    let [duration, root, target, material] = preset;
+    const step = Math.max(0, Math.min(9, Math.round(Number(value?.tier ?? value) || 0)));
+    if (name === 'merge') {
+      root = 115 * 2 ** (step / 12);
+      target = -25 + Math.min(2, step * .2) + Math.min(1.5, (value.count - 1) * .5);
+      duration += Math.min(.06, step * .008);
+    }
+    if (name === 'score') {
+      const pentatonic = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21];
+      root *= 2 ** (pentatonic[step] / 12);
+      target += Math.min(1.5, step * .18);
+    }
+    const rate = context.sampleRate;
+    const buffer = context.createBuffer(1, Math.ceil(duration * rate), rate);
+    const data = buffer.getChannelData(0);
+    let noise = 0, seed = 173 + step * 71, sum = 0, peak = 0;
+    for (let i = 0; i < data.length; i++) {
+      const t = i / rate;
+      seed = (1664525 * seed + 1013904223) >>> 0;
+      const white = seed / 2147483648 - 1;
+      noise += .20 * (white - noise);
+      const attack = Math.min(1, t / .002);
+      const release = Math.min(1, (duration - t) / .018);
+      let sample = 0;
+      if (material === 'brush') {
+        const flutter = name === 'shuffle' ? .4 + .6 * Math.sin(t * 48) ** 8 : name === 'pack' ? .2 + .8 * Math.sin(t * 97) ** 4 : 1;
+        sample = noise * Math.sin(Math.PI * t / duration) ** 1.6 * flutter;
+        sample += .08 * Math.sin(2 * Math.PI * root * t) * Math.exp(-t * 38);
+        if (name === 'pack' && t > .27) {
+          const q = t - .27;
+          sample += .45 * Math.sin(2 * Math.PI * 170 * q) * Math.exp(-q * 38) * Math.min(1, q / .002);
+        }
+      } else {
+        const modes = material === 'wood' || material === 'impact' ? [1, 2.76, 5.4] : material === 'spring' ? [1, 1.501, 3.03] : [1, 2, 3];
+        for (let k = 0; k < modes.length; k++) {
+          const bend = material === 'spring' ? 1 + .09 * Math.exp(-t * 22) : 1;
+          sample += Math.sin(2 * Math.PI * root * modes[k] * t * bend) * Math.exp(-t * (12 + k * 17)) / (1 + k * 2.4);
+        }
+        sample += noise * .45 * Math.exp(-t * 120);
+        if (material === 'impact') {
+          sample += .8 * Math.sin(2 * Math.PI * (root * .6 * t + .028 * root * (1 - Math.exp(-t * 55)))) * Math.exp(-t * 30);
+          sample += .45 * noise * Math.exp(-t * 65);
+        }
+        if (material === 'chord' || material === 'pluck') {
+          for (let k = 1; k <= 2; k++) {
+            const q = t - k * (material === 'chord' ? .08 : .033);
+            if (q > 0) sample += .4 * Math.sin(2 * Math.PI * root * (k === 1 ? 1.5 : 2) * q) * Math.exp(-q * 10) * Math.min(1, q / .005);
+          }
+        }
+      }
+      if (material === 'impact') sample = Math.tanh(sample * 3) / 2;
+      data[i] = sample * attack * release;
+      sum += data[i] * data[i];
+      peak = Math.max(peak, Math.abs(data[i]));
+    }
+    const rms = Math.sqrt(sum / data.length);
+    const gain = Math.min(10 ** (target / 20) / Math.max(rms, .0001), 10 ** (-10 / 20) / Math.max(peak, .0001));
+    for (let i = 0; i < data.length; i++) data[i] *= gain;
+    return buffer;
   }
 
   function effect(name, value) {
-    const gaps = { click: 65, slide: 45, bump: 150, score: 95, buy: 100, bank: 180, shuffle: 160, rubble: 180, boss: 300, loss: 300, upgrade: 160, win: 400 };
-    if (!canFire(name, gaps[name] || 55)) return;
-    if (name === 'click') {
-      if (performance.now() - lastClick < 65) return;
-      lastClick = performance.now();
-      sample('switch', 0.38);
-    } else if (name === 'slide') sample('switch', 0.24, 0.75);
-    else if (name === 'bump') sample('ratchet', 0.14, 0.6);
-    // Merges get a quiet pitched tick; keep the cash register texture for purchases.
-    // This preserves the feedback without turning a long chain into a coin shower.
-    else if (name === 'score') tone(180 + Math.min(12, Number(value) || 0) * 12, 0.075, 0.026);
-    else if (name === 'buy' || name === 'bank') sample('cash', name === 'bank' ? 0.58 : 0.32);
-    else if (name === 'shuffle') sample('ratchet', 0.28, 1.15);
-    else if (name === 'rubble') sample('ratchet', 0.20, 0.65);
-    else if (name === 'boss' || name === 'loss') { sample('ratchet', 0.30, 0.55); tone(110, 0.5, 0.08); }
-    else if (name === 'upgrade') { sample('coin', 0.18, 1.2); tone(660, 0.24, 0.06); }
-    else if (name === 'win') {
-      sample('cash', 0.50);
-      [0, 4, 7, 12].forEach((note, i) => setTimeout(() => tone(330 * 2 ** (note / 12), 0.25, 0.07), i * 85));
+    if (!effectsAllowed()) return;
+    const gaps = { merge: 90, click: 65, slide: 55, bump: 150, score: 95, buy: 120, bank: 250, shuffle: 160, rubble: 180, boss: 400, loss: 400, upgrade: 160, win: 500, reaction: 180 };
+    if (!canFire(name, gaps[name] || 65)) return;
+    const step = name === 'score' ? Math.max(0, Math.min(9, Math.round(Number(value) || 0))) : 0;
+    const merge = name === 'merge' ? { tier: Math.max(0, Math.min(9, Math.log2(Math.max(4, Number(value?.peak) || 4)) - 2)), count: Math.max(1, Math.min(4, Number(value?.count) || 1)) } : null;
+    const key = name + ':' + (merge ? merge.tier + ':' + merge.count : step);
+    if (!effectBuffers.has(key)) {
+      if (effectBuffers.size >= 48) effectBuffers.delete(effectBuffers.keys().next().value);
+      effectBuffers.set(key, makeEffect(name, merge || step));
     }
+    const buffer = effectBuffers.get(key);
+    if (!buffer) return;
+    const source = context.createBufferSource();
+    source.buffer = buffer;
+    source.connect(effectsGain);
+    effectVoices.add(source);
+    source.onended = () => { effectVoices.delete(source); source.disconnect(); };
+    source.start(context.currentTime);
+  }
+
+  function tone(frequency = 440) {
+    if (!effectsAllowed()) return;
+    const source = context.createBufferSource();
+    source.buffer = makeEffect('tone', frequency);
+    source.connect(effectsGain);
+    effectVoices.add(source);
+    source.onended = () => { effectVoices.delete(source); source.disconnect(); };
+    source.start(context.currentTime);
   }
 
   function set(values) {
@@ -338,6 +427,7 @@ window.AnteAudio = (() => {
     }
     if (!['auto', ...tracks].includes(prefs.track)) prefs.track = defaults.track;
     try { localStorage.setItem(storageKey, JSON.stringify(prefs)); } catch {}
+    if (prefs.muted || prefs.effects === 0) stopEffects();
     updateLevels();
     if (old.track !== prefs.track) restartMusic();
     else if ((old.music === 0 && prefs.music > 0) || (old.muted && !prefs.muted)) ensureMusic();
@@ -350,25 +440,23 @@ window.AnteAudio = (() => {
     // The room changes its filter and future-track choices; the current song continues.
   }
 
-  function pause(value) {
-    paused = !!value;
+  function syncTransport() {
     updateLevels();
-    // Mute the bus but preserve source position and crossfade timing.
-    if (!paused) ensureMusic();
-  }
-
-  document.addEventListener('visibilitychange', () => {
-    updateLevels();
-    if (document.hidden) {
-      // AudioContext time does not advance while suspended, so keep the due
-      // boundary and re-arm it when the tab returns.
+    if (paused || document.hidden) {
+      stopEffects();
       clearMusicTimer();
       context?.suspend().catch(() => {});
-    } else if (unlocked) {
-      context?.resume().catch(() => {});
-      ensureMusic();
+    } else if (unlocked && context) {
+      context.resume().then(ensureMusic).catch(() => {});
     }
-  });
+  }
+
+  function pause(value) {
+    paused = !!value;
+    syncTransport();
+  }
+
+  document.addEventListener('visibilitychange', syncTransport);
 
   // The audio script is loaded at the end of the page, so the turntable can
   // show every installed track before the settings sheet is first opened.

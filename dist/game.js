@@ -1,6 +1,6 @@
 (function(){
 "use strict";
-const VERSION="1.4";
+const VERSION="1.5";
 const STORAGE = new URLSearchParams(location.search).has("qa") ? "ante2048.qa." : "ante2048.";
 const escapeHTML = s => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]);
 const $ = id => document.getElementById(id);
@@ -13,6 +13,7 @@ const reduced = window.matchMedia && window.matchMedia("(prefers-reduced-motion:
 
 // ---------- audio ----------
 const audio = window.AnteAudio;
+const juice = window.AnteJuice;
 function ping(freq, dur=.09, type="sine", vol=.18){ audio.tone(Math.min(1500,freq),dur,vol*.45); }
 function chord(n){ audio.effect("score",n); }
 function fanfare(){ audio.effect("win"); }
@@ -32,6 +33,18 @@ const ENH={
  gold:{ico:"$",name:"Brass",desc:"+$2 when merged."},
  lucky:{ico:"★",name:"Odds",desc:"1 in 4: +8 mult. 1 in 12: +$4."},
 };
+
+// Different finishes can react once per pairing per move. The tile still
+// keeps one finish, so the board remains readable and bonuses cannot stack forever.
+const REACTIONS=[
+ {id:'overprint',pair:['bonus','mult'],name:'Overprint',desc:'Kick + Plus: +40 chips and +2 mult.'},
+ {id:'tempered',pair:['glass','steel'],name:'Tempered',desc:'Prism + Iron: this merge cannot shatter. The result keeps Iron.'},
+ {id:'shockwave',pair:['bonus','steel'],name:'Shockwave',desc:'Kick + Iron: break one extra loose rubble for 25 chips.'},
+ {id:'scratchcard',pair:['gold','lucky'],name:'Scratchcard',desc:'Brass + Odds: 1 in 4 chance for an extra $3.'},
+ {id:'refraction',pair:['glass','mult'],name:'Refraction',desc:'Prism + Plus: +2 mult per other enhanced tile in its row or column, up to +6.'},
+ {id:'wildfire',pair:['glass','lucky'],name:'Wildfire',desc:'Prism + Odds: 1 in 3 chance to give an adjacent plain tile Odds.'},
+];
+function reactionFor(enhs){return REACTIONS.find(d=>d.pair.every(e=>enhs.includes(e)));}
 
 // Charm hooks. `me` is the owned instance ({...def, st:{}, sell}). ctx.add(me, {chips|mult|xmult}) records a scoring step.
 const CHARMS=[
@@ -135,7 +148,7 @@ const CHARMS=[
  {id:"ghost",ico:"∞",name:"Second Wind",rar:"u",price:6,desc:"Once per round, if you have <em>no legal move</em>, the board reshuffles itself."},
  {id:"compactor",ico:"2→4",name:"Heavy Hopper",rar:"u",price:6,desc:"Every <em>2</em> you draw arrives as a <em>4</em> instead.",
   spawnValue:v=>v===2?4:v},
- {id:"glazier",ico:"◇",name:"Safety Glass",rar:"u",price:6,desc:"Glass tiles <em>never shatter</em>."},
+ {id:"glazier",ico:"◇",name:"Prism Guard",rar:"u",price:6,desc:"Prism tiles <em>never shatter</em>."},
  {id:"archivist",ico:"16+",name:"Catalogue",rar:"u",price:6,desc:"<em>+4 mult</em> for each <em>distinct value of 16 or more</em> in your deck.",
   score:(c,me)=>{ const k=new Set(S.deck.filter(x=>x.v>=16).map(x=>x.v)).size*4; if(k) c.add(me,{mult:k}); }},
  {id:"recycler",ico:"↺",name:"Buyback",rar:"u",price:6,desc:"When you file a tile into the deck, get <em>$1 per doubling</em> of it (a 64 pays $6).",
@@ -146,7 +159,7 @@ const CHARMS=[
   score:(c,me)=>{ if(S.chain>=5) c.add(me,{xmult:2}); }},
  {id:"downbeat",ico:"15+",name:"Downbeat",rar:"u",price:6,desc:"<em>+15 chips</em> for each link in your current chain.",
   score:(c,me)=>{ const k=Math.min(20,S.chain)*15; if(k) c.add(me,{chips:k}); }},
- {id:"mint",ico:"$",name:"Gold Rush",rar:"u",price:6,desc:"Every tile drawn from the deck has a <em>1 in 6</em> chance to come in <em>Gold</em>.",
+ {id:"mint",ico:"$",name:"Gold Rush",rar:"u",price:6,desc:"Every tile drawn from the deck has a <em>1 in 6</em> chance to come in <em>Brass</em>.",
   onDraw:card=>{ if(!card.enh&&S.rng()<1/6) card.enh="gold"; }},
  // ----- rares -----
  {id:"snowball",ico:"+⅕",name:"Compound",rar:"r",price:8,desc:"Gains <em>+0.2 mult</em> per merge, up to +30. <span class='st'>Now +{m}</span>",
@@ -230,6 +243,23 @@ let S=null, els=new Map(), locked=false, tileId=0, target=null, undoSnap=null, r
 
 function newDeck(){ const d=[]; for(let i=0;i<16;i++) d.push({v:2,enh:null}); for(let i=0;i<4;i++) d.push({v:4,enh:null}); return d; }
 function reshuffle(){ S.pile=S.deck.map(c=>({...c})); for(let i=S.pile.length-1;i>0;i--){ const j=Math.floor(S.rng()*(i+1)); [S.pile[i],S.pile[j]]=[S.pile[j],S.pile[i]]; } }
+function markMadeValue(v){ if(v>4) S.madeValues[String(v)]=(S.madeValues[String(v)]||0)+1; }
+function unlockedPackValues(){
+  const made=Object.keys(S.madeValues||{}).map(Number).filter(v=>Number.isFinite(v)&&v>4);
+  return [2,4,...new Set(made)].sort((a,b)=>a-b);
+}
+function packValue(){
+  const unlocked=unlockedPackValues().filter(v=>v>4);
+  // A high card is a treat, not the shop's default. Its odds rise gently
+  // with the run, and the pool can only contain values this run has made.
+  const highChance=Math.min(0.08+Math.max(0,S.ante-1)*0.025+(S.blind===2?0.02:0),0.24);
+  if(unlocked.length&&S.rng()<highChance){
+    const weights=unlocked.map((v,i)=>1/((i+1)**2)); const total=weights.reduce((a,b)=>a+b,0); let roll=S.rng()*total;
+    for(let i=0;i<unlocked.length;i++){ roll-=weights[i]; if(roll<=0) return unlocked[i]; }
+    return unlocked[0];
+  }
+  return S.rng()<0.58?2:4;
+}
 function draw(){ if(!S.pile.length) reshuffle(); return S.pile.shift(); }
 function deckAvg(){ return S.deck.length ? Math.round(S.deck.reduce((a,c)=>a+c.v,0)/S.deck.length*10)/10 : 0; }
 const DECK_CAP=22, DECK_MIN=12;
@@ -280,7 +310,7 @@ function newRun(seedStr){
       charms:[], cons:[], boss:null, frozen:null, mom:{dir:null,count:0}, polish:0, ghostUsed:false, consUsed:0, freeReroll:false,
       usedBosses:[], phase:"start", chain:0, banked:false, blewIt:false, movesMade:0, quota:0, quotaMet:false, shop:null, rerollCost:5, roundsWon:0, totalScore:0, bestMove:0, endless:false,
       maxCharms:MAX_CHARMS, maxCons:MAX_CONS, interestCap:5, bonusMoves:0, rerollDisc:0, vouchers:[], voucher:null,
-      deck:null, pile:[], packSize:3, packDisc:0, trims:0, retirePerRound:1, retireLeft:0, retired:[] };
+      deck:null, pile:[], packSize:3, packDisc:0, trims:0, retirePerRound:1, retireLeft:0, retired:[], madeValues:{} };
   S.deck=newDeck(); reshuffle();
   S.grid=Array.from({length:4},()=>Array(4).fill(null));
   els.forEach(e=>e.remove()); els.clear();
@@ -389,7 +419,7 @@ function slide(dir, commit){
         else res.push({tile:tiles[i]});
       }
       res.forEach((x,k)=>{ const [r,c]=seg[k]; if(x.tile.r!==r||x.tile.c!==c||x.eaten) moved=true;
-        out[r][c]=x.tile; if(commit){ x.tile.r=r;x.tile.c=c; if(x.eaten){ x.tile.v=Math.max(x.tile.v,x.eaten.v)*2; x.eaten.r=r; x.eaten.c=c;
+        out[r][c]=x.tile; if(commit){ x.tile.r=r;x.tile.c=c; if(x.eaten){ x.tile.v=Math.max(x.tile.v,x.eaten.v)*2; markMadeValue(x.tile.v); x.eaten.r=r; x.eaten.c=c;
           const enhs=[x.tile.enh,x.eaten.enh].filter(Boolean); x.tile.enh=x.tile.enh||x.eaten.enh;
           merges.push({tile:x.tile,eaten:x.eaten,v:x.tile.v,r,c,enhs}); } } });
       seg=[];
@@ -425,6 +455,7 @@ function move(dir){
   audio.effect("slide");
   setTimeout(()=>{
     res.merges.forEach(m=>{ const e=els.get(m.eaten.id); if(e){e.remove();els.delete(m.eaten.id);} const k=els.get(m.tile.id); if(k){ setVal(k,m.tile); k.classList.remove("pop"); void k.offsetWidth; k.classList.add("pop"); } });
+    if(res.merges.length){audio.effect("merge",{count:res.merges.length,peak:Math.max(...res.merges.map(m=>m.v)),chain:S.chain});juice?.merge(res.merges,els);}
     const spawns=(S.boss&&S.boss.id==="flood")?2:1;
     for(let i=0;i<spawns;i++) spawn();
     S.movesMade++;
@@ -453,6 +484,12 @@ function score(merges,maxBefore){
   if(ceil.length) ctx.steps.push({name:"The Ceiling",txt:"0 chips for "+ceil.join(", ")});
   // tile enhancements
   const plain=S.boss&&S.boss.id==="plain"; const shatterList=[]; let glassFired=0;
+  const reactions=[],reactionIds=new Set();
+  if(!plain)ctx.merges.forEach(m=>{
+    const d=reactionFor(m.enhs);
+    if(d&&!reactionIds.has(d.id)){reactionIds.add(d.id);reactions.push({d,m});}
+  });
+  const tempered=new Set(reactions.filter(x=>x.d.id==='tempered').map(x=>x.m.tile.id));
   if(!plain){
     ctx.merges.forEach(m=>{
       let list=m.enhs.slice(); if(has("alchemist")&&m.enhs.length>=2) list=list.concat(m.enhs);
@@ -460,13 +497,13 @@ function score(merges,maxBefore){
         const add=(d)=>{ if(d.chips) ctx.chips+=d.chips; if(d.mult) ctx.mult+=d.mult; if(d.xmult) ctx.xmult*=d.xmult; ctx.steps.push({name:ENH[e].name+" tile",tid:m.tile.id,chips:d.chips||0,mult:d.mult||0,xmult:d.xmult||0}); };
         if(e==="bonus") add({chips:30});
         else if(e==="mult") add({mult:4});
-        else if(e==="glass"){ if(glassFired<2){ glassFired++; add({xmult:2}); } if(!has("glazier")&&S.rng()<0.25) shatterList.push(m.tile); }
-        else if(e==="gold"){ S.money+=2; ctx.steps.push({name:"Gold tile",tid:m.tile.id,txt:"+$2"}); }
-        else if(e==="lucky"){ if(S.rng()<0.25) add({mult:8}); else ctx.steps.push({name:"Lucky tile",tid:m.tile.id,txt:"no luck"}); if(S.rng()<1/12){ S.money+=4; ctx.steps.push({name:"Lucky tile",tid:m.tile.id,txt:"+$4"}); } }
+        else if(e==="glass"){ if(glassFired<2){ glassFired++; add({xmult:2}); } if(!tempered.has(m.tile.id)&&!has("glazier")&&S.rng()<0.25) shatterList.push(m.tile); }
+        else if(e==="gold"){ S.money+=2; ctx.steps.push({name:"Brass tile",tid:m.tile.id,txt:"+$2"}); }
+        else if(e==="lucky"){ if(S.rng()<0.25) add({mult:8}); else ctx.steps.push({name:"Odds tile",tid:m.tile.id,txt:"no luck"}); if(S.rng()<1/12){ S.money+=4; ctx.steps.push({name:"Odds tile",tid:m.tile.id,txt:"+$4"}); } }
       });
     });
     const steelN=allTiles().filter(t=>t.enh==="steel").length, steelC=Math.min(6,steelN);
-    if(steelC){ const x=Math.round(Math.pow(1.2,steelC)*100)/100; ctx.xmult*=x; ctx.steps.push({name:steelN+" steel on board"+(steelN>6?" (6 count)":""),chips:0,mult:0,xmult:x}); }
+    if(steelC){ const x=Math.round(Math.pow(1.2,steelC)*100)/100; ctx.xmult*=x; ctx.steps.push({name:steelN+" Iron on board"+(steelN>6?" (6 count)":""),chips:0,mult:0,xmult:x}); }
   } else if(ctx.merges.some(m=>m.enhs.length)) ctx.steps.push({name:"The Plain",txt:"enhancements off"});
   if(merges.length>1){ const w=(merges.length-1)*2; ctx.mult+=w; ctx.steps.push({name:merges.length+" merges at once",chips:0,mult:w,xmult:0}); }
   const chainCap=(S.boss&&S.boss.id==="metronome")?3:20;
@@ -480,6 +517,26 @@ function score(merges,maxBefore){
     ctx.chips+=rc; ctx.steps.push({name:"Cleared "+cleared.length+" rubble",chips:rc,mult:0,xmult:0});
     ctx.dirty=true;
   }
+  reactions.forEach(({d,m})=>{
+    const step={name:d.name,tid:m.tile.id,reaction:d.id};
+    if(d.id==='overprint'){ctx.chips+=40;ctx.mult+=2;step.chips=40;step.mult=2;}
+    if(d.id==='tempered'){m.tile.enh='steel';ctx.dirty=true;step.txt='kept Iron · no shatter';}
+    if(d.id==='shockwave'){
+      const rubble=allTiles().filter(t=>t.rock&&!t.fixed&&t.id!==S.frozen).sort((a,b)=>(Math.abs(a.r-m.r)+Math.abs(a.c-m.c))-(Math.abs(b.r-m.r)+Math.abs(b.c-m.c)))[0];
+      if(rubble){S.grid[rubble.r][rubble.c]=null;ctx.chips+=25;step.chips=25;ctx.dirty=true;}else step.txt='no loose rubble';
+    }
+    if(d.id==='scratchcard'){const hit=S.rng()<.25;if(hit)S.money+=3;step.txt=hit?'+$3':'no payout';}
+    if(d.id==='refraction'){
+      const mult=Math.min(6,2*allTiles().filter(t=>t.id!==m.tile.id&&t.enh&&(t.r===m.r||t.c===m.c)).length);
+      if(mult){ctx.mult+=mult;step.mult=mult;}else step.txt='no enhanced neighbours in line';
+    }
+    if(d.id==='wildfire'){
+      const neighbours=allTiles().filter(t=>!t.rock&&!t.enh&&Math.abs(t.r-m.r)+Math.abs(t.c-m.c)===1);
+      if(neighbours.length&&S.rng()<1/3){const t=neighbours[Math.floor(S.rng()*neighbours.length)];t.enh='lucky';ctx.dirty=true;step.txt='Odds spread to '+t.v;}else step.txt='no spark';
+    }
+    ctx.steps.push(step);juice?.reaction(els.get(m.tile.id),d.name);
+  });
+  if(reactions.length){rec.reactions=reactions.map(x=>x.d.id);audio.effect('reaction');}
   activeCharms().slice().forEach(c=>{ if(c.score) c.score(ctx,c); });
   if(S.polish>0){ ctx.xmult*=2; S.polish--; ctx.steps.push({name:"Polish",chips:0,mult:0,xmult:2}); }
   if(S.boss&&S.boss.id==="tax"){ ctx.xmult*=0.5; ctx.steps.push({name:"The Tax",chips:0,mult:0,xmult:0.5}); }
@@ -487,7 +544,7 @@ function score(merges,maxBefore){
   const total=Math.floor(ctx.chips*mult);
   S.score+=total; S.totalScore+=total; if(total>S.bestMove) S.bestMove=total;
   rec.chips=ctx.chips; rec.mult=mult; rec.total=total; if(shatterList.length) rec.shatter=shatterList.length; curRound().moves.push(rec);
-  shatterList.forEach(t=>{ if(t.id!==S.frozen && S.grid[t.r]&&S.grid[t.r][t.c]===t){ S.grid[t.r][t.c]=null; ctx.steps.push({name:"Glass",tid:t.id,txt:"shattered "+t.v+"!",shatter:true}); const e=els.get(t.id); if(e){ e.classList.add("shatter"); setTimeout(()=>{ e.remove(); els.delete(t.id); },450); } } });
+  shatterList.forEach(t=>{ if(t.id!==S.frozen && S.grid[t.r]&&S.grid[t.r][t.c]===t){ S.grid[t.r][t.c]=null; ctx.steps.push({name:"Prism",tid:t.id,txt:"shattered "+t.v+"!",shatter:true}); const e=els.get(t.id); if(e){ e.classList.add("shatter"); setTimeout(()=>{ e.remove(); els.delete(t.id); },450); } } });
   if(ctx.dirty) syncTiles();
   return {total,steps:ctx.steps,chips:ctx.chips,mult};
 }
@@ -555,9 +612,9 @@ function afterMove(result){
     gameOver(S.quota&&!S.quotaMet&&S.score>=S.target ? "You hit the score but never built a "+S.quota+"." : S.moves<=0 ? "Out of moves. You scored "+fmt(S.score)+" of "+fmt(S.target)+"." : "No legal moves. The board locked up at "+fmt(S.score)+" of "+fmt(S.target)+".");
   }
 }
-function snapshot(){ return {grid:S.grid.map(row=>row.map(t=>t?{...t}:null)),score:S.score,moves:S.moves,money:S.money,mom:{...S.mom},polish:S.polish,pile:S.pile.map(c=>({...c})),charmSt:S.charms.map(c=>JSON.stringify(c.st))}; }
+function snapshot(){ return {grid:S.grid.map(row=>row.map(t=>t?{...t}:null)),score:S.score,moves:S.moves,money:S.money,madeValues:{...S.madeValues},mom:{...S.mom},polish:S.polish,pile:S.pile.map(c=>({...c})),charmSt:S.charms.map(c=>JSON.stringify(c.st))}; }
 function restore(sn){
-  S.grid=sn.grid.map(row=>row.map(t=>t?{...t}:null)); S.score=sn.score; S.moves=sn.moves; S.money=sn.money; S.mom={...sn.mom}; S.polish=sn.polish; S.pile=sn.pile.map(c=>({...c}));
+  S.grid=sn.grid.map(row=>row.map(t=>t?{...t}:null)); S.score=sn.score; S.moves=sn.moves; S.money=sn.money; S.madeValues={...sn.madeValues}; S.mom={...sn.mom}; S.polish=sn.polish; S.pile=sn.pile.map(c=>({...c}));
   S.charms.forEach((c,i)=>{ if(sn.charmSt[i]) c.st=JSON.parse(sn.charmSt[i]); });
   curRound().moves.push({undo:true});
   syncTiles(); render(); calcIdle();
@@ -591,7 +648,7 @@ function winRound(viaBones){
   $("retirehead").style.display="none";
   log("Won with "+fmt(S.score)+". Money now $"+S.money+".");
   banner(S.blind===2?"Boss down":"Target beaten"); confetti(); fanfare(); render(); syncTiles(); saveT();
-  setTimeout(()=>show("ov-cash"),reduced?100:900);
+  setTimeout(()=>{show("ov-cash");juice?.round($("ov-cash"),S.blind===2);},reduced?100:900);
 }
 function renderRetire(){
   const box=$("retirebox"); box.innerHTML="";
@@ -638,9 +695,13 @@ function rollShop(){
 }
 function openShop(){
   audio.setScene("shop");
-  S.workshopUsed=false;S.backroomUsed=false;S.backroomOffers=null;
+  S.workshopUsed=false; S.backroomUsed=false; S.backroomOffers=null;
+  S.workshopPack={sold:false};
+  // Oddity packs are a rare sight in regular shops and more likely after a boss.
+  S.backroomPack=S.rng()<(S.blind===2?0.33:0.16)?{sold:false}:null;
+  S.pendingJobPack=null; S.pendingPackPrice=null; S.tilePacks=[];
   S.phase="shop"; S.rerollCost=Math.max(1,5-S.rerollDisc); S.freeReroll=has("chaos"); rollShop(); pickVoucher(); S.packCount=0;
-  T.shops.push({afterAnte:S.ante,afterBlind:BLINDS[S.blind].name,money:S.money,offered:S.shop.map(i=>i.def.id).concat(S.voucher?["v:"+S.voucher.def.id]:[]),bought:[],sold:[],rerolls:0});
+  T.shops.push({afterAnte:S.ante,afterBlind:BLINDS[S.blind].name,money:S.money,offered:S.shop.map(i=>i.def.id).concat(S.voucher?["v:"+S.voucher.def.id]:[]).concat(["blueprint_pack"]).concat(S.backroomPack?["oddity_pack"]:[]),bought:[],sold:[],rerolls:0});
   const nb=S.blind+1>2?0:S.blind+1, na=nb===0?S.ante+1:S.ante;
   $("shopnext").innerHTML="Next: <b>Ante "+na+" · "+BLINDS[nb].name+"</b>, target "+fmt(targetFor(na,nb))+".";
   renderShop(); show("ov-shop");
@@ -664,20 +725,24 @@ function renderDeckShop(){
   const row=$("deckrow"); row.innerHTML="";
   const packPrice=Math.max(1,6-S.packDisc)+3*S.packCount;
   const a=document.createElement("div"); a.className="card";
-  a.innerHTML="<div class='ico'>Ⅱ</div><div style='flex:1'><div class='t'>Tile pack</div><div class='d'>Pick 1 of "+S.packSize+" cards to add to your deck. Each pack this shop costs $3 more.</div></div><button class='buy' "+(S.deck.length>=DECK_CAP||S.money-packPrice<moneyFloor()?"disabled":"")+">Open $"+packPrice+"</button>";
+  const finds=unlockedPackValues().filter(v=>v>4);
+  const findNote=finds.length?" Rare finds this run: "+finds.join(", ")+".":"";
+  a.innerHTML="<div class='ico'>Ⅱ</div><div style='flex:1'><div class='t'>Tile pack</div><div class='d'>Pick 1 of "+S.packSize+" cards to add to your deck. Each pack this shop costs $3 more. Values you have made can rarely appear here."+findNote+"</div></div><button class='buy' "+(S.deck.length>=DECK_CAP||S.money-packPrice<moneyFloor()?"disabled":"")+">Open $"+packPrice+"</button>";
   a.querySelector(".buy").onclick=()=>openPack(packPrice); row.appendChild(a);
 }
 function openPack(price){
   if(S.deck.length>=DECK_CAP||S.money-price<moneyFloor()) return;
   S.money-=price; S.packCount++; S.pendingPackPrice=price; curShop().bought.push("pack");
-  $("btnpackskip").textContent="Cancel & refund $"+price;
-  $("packtitle").textContent="Tile pack"; $("packnote").textContent="Pick one card to add to your deck.";
-  const opts=[]; const enhKeys=Object.keys(ENH);
-  for(let i=0;i<S.packSize;i++){
-    const r=S.rng(); const v = r<0.45?2 : r<0.8?4 : r<0.95?8 : 16;
+  $("btnpackskip").textContent="Skip pack";
+  $("packtitle").textContent="Tile pack"; $("packnote").textContent="Pick one card to keep. Opened packs cannot be refunded.";
+  const packIndex=S.packCount-1;
+  const opts=S.tilePacks[packIndex]||[]; const enhKeys=Object.keys(ENH);
+  for(let i=opts.length;i<S.packSize;i++){
+    const v=packValue();
     const enh = S.rng()<0.6 ? enhKeys[Math.floor(S.rng()*enhKeys.length)] : null;
     opts.push({v,enh});
   }
+  S.tilePacks[packIndex]=opts;
   const g=$("packgrid"); g.innerHTML="";
   opts.forEach(o=>{
     const el=document.createElement("button"); el.className="opt";
@@ -685,9 +750,13 @@ function openPack(price){
     el.onclick=()=>{ const before=deckSummary(); S.pendingPackPrice=null; S.deck.push({v:o.v,enh:o.enh}); recordDeckEdit("tile_pack",before,deckSummary()); S.pile.splice(Math.floor(S.rng()*(S.pile.length+1)),0,{v:o.v,enh:o.enh}); curShop().bought.push("card:"+(o.enh||"")+o.v); audio.effect("upgrade"); log("Added "+(o.enh?ENH[o.enh].name+" ":"")+"<b>"+o.v+"</b> to the deck."); hide("ov-pack"); renderShop(); };
     g.appendChild(el);
   });
-  renderShop(); show("ov-pack");
+  renderShop(); show("ov-pack"); juice?.pack($("packgrid"),"TILE PACK"); audio.effect("pack");
 }
-$("btnpackskip").onclick=()=>{ if(S.pendingPackPrice){S.money+=S.pendingPackPrice;S.pendingPackPrice=null;S.packCount--;curShop().bought.push("pack_refunded");} hide("ov-pack");renderShop(); };
+$("btnpackskip").onclick=()=>{
+  if(S.pendingPackPrice){curShop().bought.push('tile_pack_skipped');S.pendingPackPrice=null;}
+  if(S.pendingJobPack){curShop().bought.push(S.pendingJobPack.kind+'_pack_skipped');S.pendingJobPack=null;}
+  hide('ov-pack'); renderShop(); saveT();
+};
 function renderShop(){
   $("shopwallet").textContent="$"+S.money;
   $("shopgrid").innerHTML="";
@@ -702,8 +771,8 @@ function renderShop(){
     $("shopgrid").appendChild(el);
   });
   renderDeckShop(); renderVoucher(); renderWorkshop();
-  const rc=S.freeReroll?0:S.rerollCost;
-  $("btnreroll").textContent=rc?"Reroll $"+rc:"Reroll (free)"; $("btnreroll").disabled=S.money-rc<moneyFloor();
+  const rc=S.freeReroll||S.rerollTickets>0?0:S.rerollCost;
+  $("btnreroll").textContent=rc?"Reroll $"+rc:"Reroll (free)"+(S.rerollTickets>0?" · "+S.rerollTickets+" tickets":""); $("btnreroll").disabled=S.money-rc<moneyFloor();
   $("shopcharms").innerHTML="";
   if(!S.charms.length) $("shopcharms").innerHTML="<div class='empty' style='width:100%'>Buy a charm to start your build.</div>";
   S.charms.forEach((c,i)=>{
@@ -725,7 +794,7 @@ function buy(i){
   const m=$("shopwallet"); m.classList.remove("bump"); void m.offsetWidth; m.classList.add("bump");
   renderShop();
 }
-$("btnreroll").onclick=()=>{ const rc=S.freeReroll?0:S.rerollCost; if(S.money-rc<moneyFloor()) return; S.money-=rc; if(S.freeReroll) S.freeReroll=false; else S.rerollCost+=2; curShop().rerolls++; rollShop(); audio.effect("shuffle"); renderShop(); };
+$("btnreroll").onclick=()=>{ const rc=S.freeReroll||S.rerollTickets>0?0:S.rerollCost; if(S.money-rc<moneyFloor()) return; S.money-=rc; if(S.freeReroll) S.freeReroll=false; else if(S.rerollTickets>0)S.rerollTickets--; else S.rerollCost+=2; curShop().rerolls++; rollShop(); audio.effect("shuffle"); renderShop(); };
 $("btnshopnext").onclick=()=>{ hide("ov-shop"); nextRound(); };
 function growBoard(){
   if(S.N>=5) return; const N=5, g=Array.from({length:N},()=>Array(N).fill(null));
@@ -761,7 +830,7 @@ function pickTile(t){
   else if(d.stamp){ a.enh=d.stamp; const e=els.get(a.id); if(e){ e.classList.remove("zap"); void e.offsetWidth; e.classList.add("zap"); } }
   else if(d.id==="eraser"){ S.grid[a.r][a.c]=null; }
   else if(d.id==="halve"){ if(a.v===2) S.grid[a.r][a.c]=null; else a.v/=2; }
-  else if(d.id==="double"){ a.v*=2; }
+  else if(d.id==="double"){ a.v*=2; markMadeValue(a.v); }
   else if(d.id==="swap"){ if(a.id===b.id){ target.picks=[a]; hint("Pick a different second tile.",true); return; } S.grid[a.r][a.c]=b; S.grid[b.r][b.c]=a; const r=a.r,c=a.c; a.r=b.r;a.c=b.c;b.r=r;b.c=c; }
   const idx=target.idx; cancelTarget(); finishCon(idx);
 }
@@ -772,16 +841,21 @@ function finishCon(i){
   if(!canMove()) afterMove({total:0,steps:[]});
 }
 // ---------- permanent deck work ----------
-// One workshop job per shop. Bought items remain separate opportunities.
+// Special stock is offered as consumable-style packs. Each pack opens a
+// small, paid choice of deck edits and can be opened once per shop.
 const WORKSHOP=[
  {id:'trim',kind:'remove',name:'Trim',ico:'−',price:3,count:2,desc:'Remove up to 2 tiles. Keep at least 12 in your deck.'},
  {id:'recast',kind:'replace',name:'Recast',ico:'⇒',price:5,count:2,desc:'Choose a template, then turn another tile into an exact copy.'},
  {id:'duplicate',kind:'clone',name:'Duplicate',ico:'Ⅱ',price:5,count:1,desc:'Add a copy of a tile, including its enhancement. Needs a free deck slot.'},
  {id:'stamp',kind:'stamp',name:'Stamp',ico:'✦',price:6,count:1,desc:'Choose an enhancement for one tile in your deck.'},
+ {id:'dividend',kind:'dividend',name:'Dividend',ico:'$+',count:0,desc:'Gain $1 for every $2 you hold after buying this pack, up to $12.'},
+ {id:'parcel',kind:'parcel',name:'Supply Parcel',ico:'▧',count:0,desc:'Receive two different board tools. Needs two empty item slots.'},
+ {id:'pocket',kind:'pocket',name:'Side Pocket',ico:'⊔',count:0,desc:'Carry one extra item for the rest of this run. Maximum 5 slots.'},
+ {id:'tickets',kind:'tickets',name:'Ticket Roll',ico:'↻',count:0,desc:'Your next two shop rerolls are free. Tickets carry between shops.'},
 ];
 const EXPERIMENTS=[
- {id:'kiln',kind:'kiln',name:'Kiln',ico:'◇',count:2,desc:'Make 2 deck tiles Glass. Permanently lose 2 moves per round. Maximum 3 uses.'},
- {id:'smelt',kind:'smelt',name:'Smelt',ico:'▦',count:2,desc:'Destroy 2 deck tiles. Add one Steel 8. Your deck becomes one tile smaller.'},
+ {id:'kiln',kind:'kiln',name:'Kiln',ico:'◇',count:2,desc:'Make 2 deck tiles Prism. Permanently lose 2 moves per round. Maximum 3 uses.'},
+ {id:'smelt',kind:'smelt',name:'Smelt',ico:'▦',count:2,desc:'Destroy 2 deck tiles. Add one Iron 8. Your deck becomes one tile smaller.'},
  {id:'fracture',kind:'split',name:'Fracture',ico:'½',count:1,desc:'Split a tile into two halves. Both keep its enhancement. Needs a free slot.'},
  {id:'reforge',kind:'reforge',name:'Reforge',ico:'8',count:3,desc:'Turn 3 deck tiles into plain 8s. Their enhancements are removed.'},
 ];
@@ -793,6 +867,9 @@ function recordDeckEdit(kind,before,after){
   activeCharms().forEach(c=>{if(c.onDeckEdit)c.onDeckEdit(c,entry);});
 }
 function editReason(d){
+  if(d.kind==='dividend'&&S.money<2)return 'Needs cash on hand';
+  if(d.kind==='parcel'&&S.maxCons-S.cons.length<2)return 'Needs two empty item slots';
+  if(d.kind==='pocket'&&S.maxCons>=5)return 'All five item slots unlocked';
   if((d.kind==='clone'||d.kind==='split')&&S.deck.length>=DECK_CAP) return 'Deck full · trim first';
   if(d.kind==='remove'&&S.deck.length<=DECK_MIN) return 'Minimum deck size';
   if(d.kind==='smelt'&&S.deck.length<=DECK_MIN) return 'Needs at least 13 tiles';
@@ -800,17 +877,53 @@ function editReason(d){
   if(d.kind==='split'&&!S.deck.some(c=>c.v>=4)) return 'Needs a tile of 4 or more';
   return '';
 }
+function openJobPack(kind,price){
+  const pack=kind==='workshop'?S.workshopPack:S.backroomPack;
+  if(!pack||pack.sold||S.money-price<moneyFloor()) return;
+  if(!pack.options){
+    const pool=(kind==='workshop'?WORKSHOP:EXPERIMENTS).slice();
+    for(let i=pool.length-1;i>0;i--){ const j=Math.floor(S.rng()*(i+1)); [pool[i],pool[j]]=[pool[j],pool[i]]; }
+    pack.options=pool.slice(0,3);
+  }
+  S.money-=price; pack.sold=true; S.pendingJobPack={kind,price,options:pack.options};
+  curShop().bought.push(kind+'_pack');
+  audio.effect('pack');
+  renderJobPack(); juice?.pack($('packgrid'),kind==='workshop'?'BLUEPRINT':'ODDITY');
+}
+function renderJobPack(){
+  const {kind,price,options}=S.pendingJobPack;
+  const source=kind==='workshop'?'workshop-pack':'backroom-pack';
+  $('packtitle').textContent=kind==='workshop'?'Blueprint pack':'Oddity pack';
+  $('packnote').textContent='Choose one. The price includes the effect. Opened packs cannot be refunded.';
+  const g=$('packgrid'); g.innerHTML='';
+  options.forEach(d=>{
+    const el=document.createElement('button'); el.className='opt job-opt';
+    const reason=editReason(d);
+    el.innerHTML='<div class="job-opt-mark">'+d.ico+'</div><div class="nm">'+d.name+'</div><div class="ds">'+d.desc+'</div><small class="pack-tag">'+(reason||(kind==='workshop'?'WORKSHOP':'BACKROOM'))+'</small>';
+    el.disabled=!!reason;
+    el.onclick=()=>{ hide('ov-pack'); beginDeckJob(d,{source,price:0}); };
+    g.appendChild(el);
+  });
+  $('btnpackskip').textContent='Skip pack';
+  show('ov-pack');
+}
+function cancelDeckJob(){
+  deckJob=null; hide('ov-deckedit');
+  if(S.pendingJobPack)renderJobPack();
+}
 function renderWorkshop(){
   const row=$('workshoprow'); row.innerHTML='';
-  $('workshopnote').textContent=S.workshopUsed?'Job used this shop':'One job per shop';
-  WORKSHOP.forEach(d=>{
-    const card=document.createElement('div');card.className='workshop-job';
-    const reason=editReason(d),afford=S.money-d.price>=moneyFloor();
-    card.innerHTML='<div class="job-head"><span>'+d.ico+'</span><h4>'+d.name+'</h4></div><p>'+d.desc+'</p><button class="buy" '+(S.workshopUsed||reason||!afford?'disabled':'')+'>'+(S.workshopUsed?'Done':reason||'Choose · $'+d.price)+'</button>';
-    card.querySelector('button').onclick=()=>beginDeckJob(d,{source:'workshop',price:d.price});row.appendChild(card);
-  });
-  const back=$('btnbackroom');back.disabled=S.backroomUsed||S.money-8<moneyFloor();
-  back.textContent=S.backroomUsed?'Backroom used':'Backroom · $8';
+  $('workshopnote').textContent=S.workshopUsed?'Job used this shop':'One pack of each type per shop';
+  const addPack=(kind,pack,title,desc,price,mark,rare)=>{
+    if(!pack) return;
+    const afford=S.money-price>=moneyFloor();
+    const card=document.createElement('div'); card.className='card con'+(pack.sold?' sold':'');
+    card.innerHTML='<div style="display:flex;gap:10px;align-items:flex-start;width:100%"><div class="ico">'+mark+'</div><div><div class="t">'+title+'</div><div class="d">'+desc+'</div></div></div><span class="rare '+(rare?'r':'')+'">'+(rare?'rare':'special')+'</span><button class="buy" '+(pack.sold||!afford?'disabled':'')+'>'+(pack.sold?'Opened':'Open $'+price)+'</button>';
+    card.querySelector('.buy').onclick=()=>openJobPack(kind,price);
+    row.appendChild(card);
+  };
+  addPack('workshop',S.workshopPack,'Blueprint pack','Choose 1 of 3: deck work, supplies, cash or run upgrades.',6,'✦',false);
+  addPack('backroom',S.backroomPack,'Oddity pack','Choose 1 of 3 backroom jobs. Stronger edits, stranger costs.',8,'◇',true);
 }
 function beginDeckJob(def,options={}){
   const reason=editReason(def);if(reason){hint(reason,true);return;}
@@ -821,6 +934,11 @@ function renderDeckJob(){
   const job=deckJob,d=job.def,picks=job.picks;
   $('editname').textContent=d.name;
   $('editdesc').textContent=d.desc;
+  if(d.count===0){
+    $('editstep').textContent='Use now';$('editenh').hidden=true;$('editgrid').innerHTML='';
+    $('editpreview').textContent=d.kind==='dividend'?'Collect $'+Math.min(12,Math.floor(Math.max(0,S.money)/2))+'.':d.kind==='pocket'?'Item slots: '+S.maxCons+' → '+(S.maxCons+1)+'.':d.kind==='tickets'?'Add 2 free reroll tickets.': 'Open the parcel for two different board tools.';
+    $('editcount').textContent='Run upgrade';$('btneditapply').textContent='Use';$('btneditapply').disabled=!!editReason(d);return;
+  }
   const need=d.count||(d.kind==='replace'?2:1);
   $('editstep').textContent=d.kind==='replace'?(picks.length===0?'1 / Choose the tile to copy.':picks.length===1?'2 / Choose the tile to replace.':'Review your conversion.'):
     'Choose '+(d.kind==='remove'?'up to ':'')+need+' tile'+(need>1?'s':'')+' · '+picks.length+' selected';
@@ -853,8 +971,8 @@ function renderDeckJob(){
     else if(d.kind==='remove')preview.textContent='Remove '+cards.map(name).join(' and ')+'. '+(S.deck.length-cards.length)+' tiles remain.';
     else if(d.kind==='clone')preview.textContent='Add one '+name(cards[0])+'. Deck: '+S.deck.length+' → '+(S.deck.length+1)+'.';
     else if(d.kind==='stamp')preview.textContent=name(cards[0])+' → '+ENH[job.enh].name+' '+cards[0].v+'. Future draws use the new enhancement.';
-    else if(d.kind==='kiln')preview.textContent='Both become Glass. All future rounds have 2 fewer moves.';
-    else if(d.kind==='smelt')preview.textContent='Destroy '+cards.map(name).join(' and ')+'. Add a Steel 8.';
+    else if(d.kind==='kiln')preview.textContent='Both become Prism. All future rounds have 2 fewer moves.';
+    else if(d.kind==='smelt')preview.textContent='Destroy '+cards.map(name).join(' and ')+'. Add an Iron 8.';
     else if(d.kind==='split')preview.textContent=name(cards[0])+' → two '+name({...cards[0],v:cards[0].v/2})+' tiles.';
     else if(d.kind==='reforge')preview.textContent='Replace all 3 selected tiles with plain 8s.';
     else if(d.kind==='promote')preview.textContent=name(cards[0])+' → '+name({...cards[0],v:cards[0].v*2})+'.';
@@ -868,7 +986,14 @@ function applyDeckJob(){
   const job=deckJob;if(!job||$('btneditapply').disabled)return;
   const d=job.def,indices=job.picks,cards=indices.map(i=>({...S.deck[i]})),before=deckSummary();
   if(editReason(d)||S.money-job.price<moneyFloor())return;
-  if(d.kind==='replace')S.deck[indices[1]]={...cards[0]};
+  if(d.kind==='dividend')S.money+=Math.min(12,Math.floor(Math.max(0,S.money)/2));
+  else if(d.kind==='pocket')S.maxCons++;
+  else if(d.kind==='tickets')S.rerollTickets=(S.rerollTickets||0)+2;
+  else if(d.kind==='parcel'){
+    const tools=CONS.filter(c=>['eraser','halve','swap','shuffle','purge','clock','jack'].includes(c.id));
+    for(let i=0;i<2;i++){const j=Math.floor(S.rng()*tools.length);S.cons.push({...tools.splice(j,1)[0]});}
+  }
+  else if(d.kind==='replace')S.deck[indices[1]]={...cards[0]};
   else if(d.kind==='remove')indices.slice().sort((a,b)=>b-a).forEach(i=>S.deck.splice(i,1));
   else if(d.kind==='clone')S.deck.push({...cards[0]});
   else if(d.kind==='stamp')S.deck[indices[0]].enh=job.enh;
@@ -879,39 +1004,27 @@ function applyDeckJob(){
   else if(d.kind==='split'){S.deck[indices[0]].v/=2;S.deck.push({...S.deck[indices[0]]});}
   else if(d.kind==='reforge')indices.forEach(i=>S.deck[i]={v:8,enh:null});
   S.money-=job.price;
-  if(job.source==='workshop')S.workshopUsed=true;
-  if(job.source==='backroom'){S.backroomUsed=true;hide('ov-backroom');}
+  if(job.source==='workshop'||job.source==='workshop-pack')S.workshopUsed=true;
+  if(job.source.endsWith('-pack'))S.pendingJobPack=null;
+  if(job.source==='backroom'||job.source==='backroom-pack'){S.backroomUsed=true;hide('ov-backroom');}
   if(job.source==='item'){
     S.cons.splice(job.idx,1);S.consUsed++;S.charms.forEach(c=>{if(c.onUseCon)c.onUseCon(c);});
     if(S.phase==='round')curRound().moves.push({con:d.id,deck:true});
   }
   if(S.phase==='shop')curShop().bought.push((job.source==='item'?'used:':job.source+':')+d.id);
-  recordDeckEdit(d.id,before,deckSummary());
+  if(d.count!==0)recordDeckEdit(d.id,before,deckSummary());
+  else {S.consUsed++;S.charms.forEach(c=>{if(c.onUseCon)c.onUseCon(c);});}
   log('<b>'+d.name+'</b>: '+$('editpreview').textContent);
-  deckJob=null;undoSnap=null;reshuffle();hide('ov-deckedit');audio.effect('upgrade');
+  deckJob=null;undoSnap=null;if(d.count!==0)reshuffle();hide('ov-deckedit');audio.effect('upgrade');
   render();if(S.phase==='shop')renderShop();saveT();
 }
 function openDeckPick(i,d){
   const kinds={promote:'promote',twin:'clone',burn:'remove',temper:'random',recast_item:'replace',split_item:'split'};
   beginDeckJob({...d,kind:d.stamp?'stamp':kinds[d.id],count:d.id==='recast_item'?2:1},{source:'item',idx:i});
 }
-function showBackroom(){
-  if(S.backroomUsed||S.money-8<moneyFloor())return;
-  if(!S.backroomOffers){
-    const pool=EXPERIMENTS.slice();for(let i=pool.length-1;i>0;i--){const j=Math.floor(S.rng()*(i+1));[pool[i],pool[j]]=[pool[j],pool[i]];}
-    S.backroomOffers=pool.slice(0,3).map(d=>d.id);
-  }
-  const grid=$('backroomgrid');grid.innerHTML='';
-  S.backroomOffers.forEach(id=>{
-    const d=EXPERIMENTS.find(x=>x.id===id),card=document.createElement('div');card.className='backroom-card';
-    const reason=editReason(d);
-    card.innerHTML='<div class="experiment-mark">'+d.ico+'</div><h3>'+d.name+'</h3><p>'+d.desc+'</p><button class="buy" '+(reason?'disabled':'')+'>'+(reason||'Choose · $8')+'</button>';
-    card.querySelector('button').onclick=()=>beginDeckJob(d,{source:'backroom',price:8});grid.appendChild(card);
-  });show('ov-backroom');
-}
+function showBackroom(){ openJobPack('backroom',8); }
 $('btneditapply').onclick=applyDeckJob;
-$('btneditcancel').onclick=()=>{deckJob=null;hide('ov-deckedit');};
-$('btnbackroom').onclick=showBackroom;
+$('btneditcancel').onclick=cancelDeckJob;
 $('btnbackroomclose').onclick=()=>hide('ov-backroom');
 
 function cancelTarget(){ target=null; $("board").classList.remove("targeting"); renderCons(); syncTiles(); hint(""); }
@@ -1175,7 +1288,7 @@ document.addEventListener('keydown',e=>{
   }
   if(e.key==='Escape'){
     e.preventDefault();
-    if(top){if(dismissable.has(top)){if(top==='ov-deckedit')deckJob=null;hide(top);}}
+    if(top){if(top==='ov-deckedit')cancelDeckJob();else if(top==='ov-pack')$('btnpackskip').click();else if(dismissable.has(top))hide(top);}
     else if(target) cancelTarget();
     else if(S&&S.phase==='round') show('ov-pause');
     return;
