@@ -68,3 +68,7 @@ Measured at source, before the effect slider/master:
 | win | -25.37 | -10.00 |
 
 Validation: `node --test tests/audio.test.js` checks uninterrupted scene transitions, prefetch timing, slow-load fallback, transport position across pause and visibility, manual looping, no unmute burst, measured effect RMS/peaks, and increased multi-merge energy. All testing was silent; perceived timbre still benefits from the user's listening feedback.
+
+### Final listening feedback
+
+Routine slide sounds are disabled, and the repeated score finish is 4 dB quieter with a shorter tail. Multiplier receipt lines no longer add separate chirps. Merge impacts, pack opening, reactions and round rewards remain. Raw file pages use native media playback for local MP3 access; the hosted game uses the prefetched, calibrated crossfade mixer. No additional tests or listening session were run after these final changes, per the user's request.

@@ -576,7 +576,6 @@ function reveal(res){
       }
       if(s.uid){ const el=document.querySelector('.card[data-uid="'+s.uid+'"]'); if(el){ el.classList.remove("hit"); void el.offsetWidth; el.classList.add("hit"); } }
       if(s.tid&&!s.shatter){ const el=els.get(s.tid); if(el){ el.classList.remove("zap"); void el.offsetWidth; el.classList.add("zap"); } }
-      if(s.xmult>1) audio.tone(330*Math.pow(2,Math.min(i,8)/12),.08,.028);
     },stepMs*i));
   });
   revealTimer.push(setTimeout(()=>{ pendingReveal=null; calcFinal(res); },stepMs*res.steps.length+40));

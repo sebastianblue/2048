@@ -32,6 +32,39 @@ window.AnteAudio = (() => {
   }
   if (!['auto', ...tracks].includes(prefs.track)) prefs.track = defaults.track;
 
+  const localFiles = location.protocol === 'file:';
+  let localPlayer = null;
+  let localLevel = 1;
+  let localPlayed = 0;
+
+  // File pages cannot fetch/decode local MP3s in many browsers. Native media
+  // playback can read them without routing through a cross-origin audio graph.
+  function ensureLocalMusic() {
+    if (!unlocked || paused || document.hidden || prefs.muted || !prefs.music) return;
+    if (!localPlayer) {
+      const name = chooseTrack();
+      localPlayer = new Audio(new URL('./audio/' + name + '.mp3', location.href).href);
+      localLevel = 10 ** ((trackDefs.find(track => track.id === name)?.gainDb || 0) / 20);
+      currentTrack = name;
+      recentTracks = [name, ...recentTracks.filter(id => id !== name)].slice(0,3);
+      localPlayer.preload = 'auto';
+      localPlayer.onended = () => {
+        localPlayed += localPlayer.duration || 0;
+        if (prefs.track === 'auto' && localPlayed >= 90) {localPlayer = null;localPlayed = 0;}
+        else localPlayer.currentTime = 0;
+        ensureLocalMusic();
+      };
+      localPlayer.onerror = () => status('This track could not load. Try another track in Sound.');
+    }
+    updateLocalLevel();
+    if (localPlayer.paused) localPlayer.play().then(() => status('')).catch(() => status('Tap Sound to start the music.'));
+  }
+  function updateLocalLevel() {
+    if (!localPlayer) return;
+    const room = scene === 'shop' ? .72 : scene === 'boss' ? .54 : .62;
+    localPlayer.volume = Math.max(0,Math.min(1,(prefs.muted || paused || document.hidden ? 0 : prefs.music / 100) * localLevel * room * .72));
+  }
+
   let context;
   let master;
   let musicGain;
@@ -153,6 +186,7 @@ window.AnteAudio = (() => {
   }
 
   function updateLevels() {
+    updateLocalLevel();
     if (!context) return;
     const now = context.currentTime;
     const silent = prefs.muted || paused || document.hidden;
@@ -178,6 +212,7 @@ window.AnteAudio = (() => {
   }
 
   function stopMusic() {
+    if (localPlayer) {localPlayer.pause();localPlayer.src='';localPlayer=null;localPlayed=0;}
     musicGeneration++;
     clearMusicTimer();
     timerDue = null;
@@ -277,6 +312,7 @@ window.AnteAudio = (() => {
   }
 
   function ensureMusic() {
+    if(localFiles){ensureLocalMusic();return;}
     if (!context || !unlocked || paused || document.hidden || prefs.muted || prefs.music === 0) return;
     const generation = musicGeneration;
     if (timerDue !== null && !musicTimer) {
@@ -317,7 +353,7 @@ window.AnteAudio = (() => {
     const presets = {
       click: [.065, 440, -30, 'wood'], slide: [.10, 130, -31, 'brush'],
       merge: [.19, 140, -25, 'impact'],
-      bump: [.13, 85, -28, 'wood'], score: [.23, 240, -25, 'wood'],
+      bump: [.13, 85, -28, 'wood'], score: [.16, 220, -29, 'wood'],
       buy: [.24, 310, -26, 'pluck'], bank: [.48, 360, -25, 'chord'],
       shuffle: [.24, 180, -29, 'brush'], pack: [.42, 160, -26, 'brush'], rubble: [.23, 75, -28, 'wood'],
       boss: [.65, 86, -28, 'chord'], loss: [.62, 74, -29, 'chord'],
@@ -388,6 +424,8 @@ window.AnteAudio = (() => {
   }
 
   function effect(name, value) {
+    if(name === 'slide')return;
+
     if (!effectsAllowed()) return;
     const gaps = { merge: 90, click: 65, slide: 55, bump: 150, score: 95, buy: 120, bank: 250, shuffle: 160, rubble: 180, boss: 400, loss: 400, upgrade: 160, win: 500, reaction: 180 };
     if (!canFire(name, gaps[name] || 65)) return;
@@ -442,6 +480,7 @@ window.AnteAudio = (() => {
 
   function syncTransport() {
     updateLevels();
+    if(localPlayer && (paused || document.hidden))localPlayer.pause();
     if (paused || document.hidden) {
       stopEffects();
       clearMusicTimer();

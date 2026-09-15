@@ -74,7 +74,7 @@ test('muting kills effect tails and suppresses new sounds without a queued burst
 test('effects have calibrated RMS levels and peak headroom, including reactions', async () => {
   const r = rig(); await r.audio.unlock(); await r.flush();
   const report = [];
-  for (const name of ['click', 'slide', 'bump', 'score', 'merge', 'pack', 'buy', 'bank', 'shuffle', 'rubble', 'boss', 'loss', 'upgrade', 'reaction', 'win']) {
+  for (const name of ['click', 'bump', 'score', 'merge', 'pack', 'buy', 'bank', 'shuffle', 'rubble', 'boss', 'loss', 'upgrade', 'reaction', 'win']) {
     await r.advance(1); r.audio.effect(name, 3);
     const data = r.sources.at(-1).buffer.getChannelData(0);
     let peak = 0, sum = 0;
