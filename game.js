@@ -1,6 +1,6 @@
 (function(){
 "use strict";
-const VERSION="1.6.1";
+const VERSION="1.7.0";
 const STORAGE = new URLSearchParams(location.search).has("qa") ? "ante2048.qa." : "ante2048.";
 const escapeHTML = s => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]);
 const $ = id => document.getElementById(id);
@@ -187,8 +187,8 @@ const CHARMS=[
  {id:"alchemist",ico:"++",name:"Catalyst",rar:"r",price:8,desc:"When two <em>enhanced</em> tiles merge, the new tile fires both enhancements <em>again</em>."},
 ];
 const CONS=[
- {id:"recast_item",ico:"⇒",name:"Mould",price:5,desc:"Turn one deck tile into an exact copy of another. Keeps the deck size.",deck:true},
- {id:"split_item",ico:"½",name:"Wedge",price:4,desc:"Split a deck tile into two halves. Both keep its enhancement. Needs a free slot.",deck:true},
+ {id:"recast_item",ico:"⇒",name:"Mould",price:5,desc:"Turn one tile into an exact copy of another.",deck:true},
+ {id:"split_item",ico:"½",name:"Wedge",price:4,desc:"Split a tile into two halves. Both keep its enhancement. Needs a free slot.",deck:true},
  {id:"eraser",ico:"−",name:"Eraser",price:3,desc:"Remove one tile.",targets:1},
  {id:"halve",ico:"½",name:"Halve",price:3,desc:"Halve one tile (a 2 is removed).",targets:1},
  {id:"double",ico:"×2",name:"Double",price:5,desc:"Double one tile.",targets:1},
@@ -196,20 +196,20 @@ const CONS=[
  {id:"shuffle",ico:"↻",name:"Shuffle",price:3,desc:"Scatter every tile to a random cell.",targets:0},
  {id:"purge",ico:"∅",name:"Purge",price:4,desc:"Remove every 2 and 4 on the board.",targets:0},
  {id:"undo",ico:"↶",name:"Undo",price:4,desc:"Take back your last move.",targets:0},
- {id:"clock",ico:"+6",name:"Clock",price:3,desc:"+6 moves this round.",targets:0},
+ {id:"clock",ico:"+6",name:"Clock",price:3,desc:"+6 moves. In the shop, save them for the next round.",targets:0},
  {id:"polish",ico:"×2",name:"Polish",price:6,desc:"Your next 3 scoring moves get ×2 mult.",targets:0},
- {id:"st_bonus",ico:"+30",name:"Kick Stamp",price:3,desc:"Enhance one deck tile: +30 chips when it merges.",targets:1,deck:true,stamp:"bonus"},
- {id:"st_mult",ico:"+4",name:"Plus Stamp",price:4,desc:"Enhance one deck tile: +4 mult when it merges.",targets:1,deck:true,stamp:"mult"},
- {id:"st_glass",ico:"◇",name:"Prism Stamp",price:4,desc:"Enhance one deck tile: ×2 mult when it merges, 1 in 4 to shatter.",targets:1,deck:true,stamp:"glass"},
- {id:"st_steel",ico:"▦",name:"Iron Stamp",price:5,desc:"Enhance one deck tile: ×1.2 mult while on the board, at most 6 counted.",targets:1,deck:true,stamp:"steel"},
- {id:"st_gold",ico:"$",name:"Brass Stamp",price:3,desc:"Enhance one deck tile: +$2 when it merges.",targets:1,deck:true,stamp:"gold"},
- {id:"st_lucky",ico:"★",name:"Odds Stamp",price:3,desc:"Enhance one deck tile: 1 in 4 for +8 mult, 1 in 12 for +$4.",targets:1,deck:true,stamp:"lucky"},
+ {id:"st_bonus",ico:"+30",name:"Kick Blueprint",price:3,desc:"Enhance one tile: +30 chips when it merges.",targets:1,deck:true,stamp:"bonus"},
+ {id:"st_mult",ico:"+4",name:"Plus Blueprint",price:4,desc:"Enhance one tile: +4 mult when it merges.",targets:1,deck:true,stamp:"mult"},
+ {id:"st_glass",ico:"◇",name:"Prism Blueprint",price:4,desc:"Enhance one tile: ×2 mult when it merges, 1 in 4 to shatter.",targets:1,deck:true,stamp:"glass"},
+ {id:"st_steel",ico:"▦",name:"Iron Blueprint",price:5,desc:"Enhance one tile: ×1.2 mult while on the board, at most 6 counted.",targets:1,deck:true,stamp:"steel"},
+ {id:"st_gold",ico:"$",name:"Brass Blueprint",price:3,desc:"Enhance one tile: +$2 when it merges.",targets:1,deck:true,stamp:"gold"},
+ {id:"st_lucky",ico:"★",name:"Odds Blueprint",price:3,desc:"Enhance one tile: 1 in 4 for +8 mult, 1 in 12 for +$4.",targets:1,deck:true,stamp:"lucky"},
  {id:"jack",ico:"✕",name:"Jackhammer",price:3,desc:"Clear every piece of rubble on the board.",targets:0},
  {id:"file",ico:"↓",name:"Archive",price:7,desc:"Send a tile from the board into your deck. ",targets:1,file:true},
- {id:"promote",ico:"↑",name:"Promote",price:4,desc:"Double one card in your deck. A 2 becomes a 4.",deck:true},
- {id:"twin",ico:"Ⅱ",name:"Twin",price:5,desc:"Add a second copy of one card in your deck.",deck:true},
- {id:"burn",ico:"−",name:"Burn",price:3,desc:"Destroy one card in your deck.",deck:true},
- {id:"temper",ico:"✦",name:"Temper",price:5,desc:"Give one deck card a random enhancement.",deck:true},
+ {id:"promote",ico:"↑",name:"Promote",price:4,desc:"Double one tile. A 2 becomes a 4.",deck:true},
+ {id:"twin",ico:"Ⅱ",name:"Twin",price:5,desc:"Add a second copy of one tile. Needs a free slot.",deck:true},
+ {id:"burn",ico:"−",name:"Burn",price:3,desc:"Destroy one tile.",deck:true},
+ {id:"temper",ico:"✦",name:"Temper",price:5,desc:"Give one tile a random enhancement.",deck:true},
 ];
 const VOUCHERS=[
  {id:"overclock",ico:"+4",name:"Overclock",price:8,desc:"+4 moves every round. Stacks up to three times.",max:3,apply:()=>{S.bonusMoves+=4;}},
@@ -380,7 +380,7 @@ function startRound(){
   if(S.boss&&S.boss.id==="quota"){ S.quota=S.ante<=2?64:S.ante<=4?128:256; }
   if(S.vouchers.includes("headstart")){ allTiles().sort((a,b)=>a.v-b.v).forEach(t=>{ t.v*=2; }); }
   activeCharms().slice().forEach(c=>{ if(c.roundStart) c.roundStart(c); });
-  S.moves=roundMoves(); S.moveCap=S.moves; S.rubbleIn=rubbleEvery();
+  S.moves=roundMoves()+(S.nextMoves||0); S.nextMoves=0; S.moveCap=S.moves; S.rubbleIn=rubbleEvery();
   if(S.boss && S.boss.id==="freeze"){ const t=allTiles(); const pick=t[Math.floor(S.rng()*t.length)]; S.frozen=pick.id; }
   T.rounds.push({ante:S.ante,blind:BLINDS[S.blind].name,boss:S.boss?S.boss.id:null,target:S.target,movesAllowed:S.moves,moneyStart:S.money,
     boardStart:boardValues(),charms:S.charms.map(c=>c.id),cons:S.cons.map(c=>c.id),vouchers:S.vouchers.slice(),deck:deckSummary(),deckAvg:deckAvg(),moves:[],result:null});
@@ -670,9 +670,9 @@ function confetti(){ if(reduced) return; const cols=["#edc15c","#efe8d4","#d7583
 $("btncashnow").onclick=()=>{ if(S.phase==="round"&&S.banked){ S.phase="cash"; finishReveal(); winRound(); } };
 $("btncash").onclick=()=>{
   const rr=curRound(); if(S.retired.length){ rr.filed=S.retired.slice(); S.retired=[]; }
-  hide("ov-cash");
-  if(S.blind===2 && S.ante===8 && !S.endless){ winRun(); return; }
+  if(S.blind===2 && S.ante===8 && !S.endless){ hide("ov-cash"); winRun(); return; }
   openShop();
+  hide("ov-cash");
 };
 function nextRound(){
   S.blind++; if(S.blind>2){ S.blind=0; S.ante++; }
@@ -693,14 +693,39 @@ function rollShop(){
   S.shop=items;
 }
 function openShop(){
+  ensureShopLayout();
   audio.setScene("shop");
   S.pendingJobPack=null; S.pendingTilePack=null;
-  S.phase="shop"; S.rerollCost=Math.max(1,5-S.rerollDisc); S.freeReroll=has("chaos"); rollShop(); pickVoucher();
-  S.packs=rollPacks();
-  T.shops.push({afterAnte:S.ante,afterBlind:BLINDS[S.blind].name,money:S.money,offered:S.shop.map(i=>i.def.id).concat(S.voucher?["v:"+S.voucher.def.id]:[]).concat(S.packs.map(p=>'pack:'+p.kind+':'+p.size)),bought:[],sold:[],rerolls:0});
+  if(S.phase!=="shop"){
+    S.phase="shop"; S.rerollCost=Math.max(1,5-S.rerollDisc); S.freeReroll=has("chaos"); rollShop(); pickVoucher();
+    S.packs=rollPacks();
+    T.shops.push({afterAnte:S.ante,afterBlind:BLINDS[S.blind].name,money:S.money,offered:S.shop.map(i=>i.def.id).concat(S.voucher?["v:"+S.voucher.def.id]:[]).concat(S.packs.map(p=>'pack:'+p.kind+':'+p.size)),bought:[],sold:[],rerolls:0});
+  }
   const nb=S.blind+1>2?0:S.blind+1, na=nb===0?S.ante+1:S.ante;
   $("shopnext").innerHTML="Next: <b>Ante "+na+" · "+BLINDS[nb].name+"</b>, target "+fmt(targetFor(na,nb))+".";
   renderShop(); show("ov-shop");
+}
+// Older cached HTML used separate Deck and Special stock sections. Upgrade
+// that layout before rendering, so a mixed-version page can still open the shop.
+function ensureShopLayout(){
+  const version=document.querySelector('.footer small');if(version)version.textContent=VERSION;
+  if(!$('packstock')){
+    const section=document.createElement('div');section.className='shopsec packs-section';
+    section.innerHTML='<h3>Packs <span>Two offers · new stock next shop</span></h3><div id="packstock" class="shopgrid pack-stock"></div><p id="shopdeck" class="pack-decknote"></p>';
+    const old=$('deckrow')?.closest('.shopsec');
+    if(old)old.replaceWith(section);else $('shopgrid').after(section);
+    $('workshoprow')?.closest('.shopsec')?.remove();
+  }
+  if(!$('shopcons')){
+    const section=document.createElement('div');section.className='shopsec';
+    section.innerHTML='<h3>Your items <span id="shopconsnote"></span></h3><div class="item-rack" id="shopcons"></div>';
+    $('shopcharms').closest('.shopsec').before(section);
+  }
+  if(!$('packworkbench')){
+    const section=document.createElement('div');section.id='packworkbench';section.className='pack-workbench';section.hidden=true;
+    section.innerHTML='<h3>On the table <span id="packhandnote"></span></h3><div class="pack-hand" id="packhand"></div><p class="hand-note">These are the tiles you can edit. Both picks use the same hand.</p><h3>Your items</h3><div class="item-rack" id="packcons"></div>';
+    $('packgrid').after(section);
+  }
 }
 function curShop(){ return T.shops[T.shops.length-1]; }
 function pickVoucher(){
@@ -765,6 +790,7 @@ function openPack(pack){
   renderShop();renderTilePack();juice?.pack($('packgrid'),packName(pack).toUpperCase());audio.effect('pack');saveT();
 }
 function renderTilePack(){
+  $('packworkbench').hidden=true;
   const pending=S.pendingTilePack,{pack,options,taken,remaining}=pending;
   $('packtitle').textContent=packName(pack);
   $('packnote').textContent='Choose '+remaining+' more. '+(DECK_CAP-S.deck.length)+' deck slots free. Opened packs cannot be refunded.';
@@ -800,12 +826,18 @@ function renderShop(){
     const afford = S.money-d.price>=moneyFloor();
     const el=document.createElement("div"); el.className="card"+(it.sold?" sold":"")+(it.kind==="con"?" con":"");
     el.innerHTML="<div style='display:flex;gap:10px;align-items:flex-start;width:100%'><div class='ico'>"+d.ico+"</div><div><div class='t'>"+d.name+"</div><div class='d'>"+descOf(d)+"</div></div></div>"+
-      (it.kind==="charm"?"<span class='rare "+d.rar+"'>"+({c:"common",u:"uncommon",r:"rare"})[d.rar]+"</span>":"<span class='rare' style='background:var(--blue2);color:var(--ink)'>"+(d.stamp?"stamp":"consumable")+"</span>")+
+      (it.kind==="charm"?"<span class='rare "+d.rar+"'>"+({c:"common",u:"uncommon",r:"rare"})[d.rar]+"</span>":"<span class='rare' style='background:var(--blue2);color:var(--ink)'>"+(d.stamp?"blueprint":"consumable")+"</span>")+
       "<button class='buy' "+(it.sold||!afford||full?"disabled":"")+">"+(it.sold?"Sold":full?"No room":"Buy $"+d.price)+"</button>";
     el.querySelector(".buy").onclick=()=>buy(i);
+    if(it.kind==='con'&&instantCon(d)){
+      const use=document.createElement('button');use.className='buy use-now';use.textContent='Buy & use $'+d.price;
+      use.disabled=it.sold||!afford||!!conReason(d,'shop');use.onclick=()=>buyAndUse(i);el.appendChild(use);
+    }
     $("shopgrid").appendChild(el);
   });
   renderPacks(); renderVoucher();
+  renderItemRack($('shopcons'),'shop');
+  $('shopconsnote').textContent=(S.nextMoves?'+'+S.nextMoves+' moves next round · ':'')+(S.polish?S.polish+' polished moves · ':'')+S.cons.length+' / '+S.maxCons;
   const rc=S.freeReroll||S.rerollTickets>0?0:S.rerollCost;
   $("btnreroll").textContent=rc?"Reroll $"+rc:"Reroll (free)"+(S.rerollTickets>0?" · "+S.rerollTickets+" tickets":""); $("btnreroll").disabled=S.money-rc<moneyFloor();
   $("shopcharms").innerHTML="";
@@ -829,6 +861,12 @@ function buy(i){
   const m=$("shopwallet"); m.classList.remove("bump"); void m.offsetWidth; m.classList.add("bump");
   renderShop();
 }
+function buyAndUse(i){
+  const it=S.shop[i],d=it.def;
+  if(S.phase!=='shop'||it.kind!=='con'||!instantCon(d)||it.sold||S.money-d.price<moneyFloor()||conReason(d,'shop'))return;
+  S.money-=d.price;it.sold=true;curShop().bought.push(d.id);
+  S.cons.push({...d});useCon(S.cons.length-1,'shop');
+}
 $("btnreroll").onclick=()=>{ const rc=S.freeReroll||S.rerollTickets>0?0:S.rerollCost; if(S.money-rc<moneyFloor()) return; S.money-=rc; if(S.freeReroll) S.freeReroll=false; else if(S.rerollTickets>0)S.rerollTickets--; else S.rerollCost+=2; curShop().rerolls++; rollShop(); audio.effect("shuffle"); renderShop(); };
 $("btnshopnext").onclick=()=>{ hide("ov-shop"); nextRound(); };
 function growBoard(){
@@ -837,19 +875,59 @@ function growBoard(){
 }
 
 // ---------- consumables ----------
-function useCon(i){
-  if(locked) return;
-  const d=S.cons[i];
-  if(d.deck||d.stamp){ if(target)cancelTarget(); openDeckPick(i,d); return; }
-  if(S.phase!=="round") return;
+function instantCon(d){return d.id==='clock'||d.id==='polish';}
+function deckDef(d){
+  const kinds={promote:'promote',twin:'clone',burn:'remove',temper:'random',recast_item:'replace',split_item:'split',eraser:'remove',halve:'halve',double:'promote'};
+  const kind=d.stamp?'stamp':kinds[d.id];
+  return kind?{...d,kind,count:kind==='replace'?2:1}:null;
+}
+function boardTargets(d){return d.deck||d.stamp?(d.id==='recast_item'?2:1):d.targets;}
+function conReason(d,place){
+  if(d.id==='polish'&&S.polish>=3)return 'Polish is already ready';
+  if(place==='shop')return instantCon(d)?'':deckDef(d)?'Use on the board or in a Blueprint / Oddity pack':'Use on the board';
+  if(place==='pack'){
+    if(!S.pendingJobPack)return 'Open a Blueprint or Oddity pack first';
+    if(instantCon(d))return '';
+    const def=deckDef(d);return def?editReason(def,packHand()):'Board only';
+  }
+  if(S.phase!=='round')return 'Use during a round';
+  if((d.id==='twin'||d.id==='split_item')&&!emptyCells().length)return 'Needs an empty cell';
+  if(d.id==='undo'&&!undoSnap)return 'No move to undo';
+  return '';
+}
+function conDescription(d,place){
+  if(d.stamp)return 'Give one '+(place==='pack'?'deck ':'')+'tile '+ENH[d.stamp].name+'. '+ENH[d.stamp].desc;
+  return d.desc.replace('Needs a free slot.','Needs a free '+(place==='pack'?'deck slot.':'cell.'));
+}
+function renderItemRack(container,place){
+  container.innerHTML='';
+  if(!S.cons.length){container.innerHTML='<div class="empty">No items held.</div>';return;}
+  S.cons.forEach((d,i)=>{
+    const reason=conReason(d,place),button=document.createElement('button');button.className='card use';button.disabled=!!reason;
+    button.innerHTML='<div class="ico">'+d.ico+'</div><div><div class="t">'+d.name+'</div><div class="d">'+conDescription(d,place)+'</div><small class="item-action">'+(reason|| (place==='pack'&&deckDef(d)?'Use on this hand':'Use now'))+'</small></div>';
+    button.onclick=()=>useCon(i,place);container.appendChild(button);
+  });
+}
+function useCon(i,place='board'){
+  if(locked||deckJob) return;
+  const d=S.cons[i];if(!d)return;
+  const reason=conReason(d,place);if(reason){hint(reason,true);return;}
+  if(place==='pack'&&deckDef(d)){openDeckPick(i,d);return;}
   if(target){ cancelTarget(); return; }
-  if(d.targets>0){ target={idx:i,def:d,picks:[]}; $("board").classList.add("targeting"); renderCons(); syncTiles(); hint(d.targets===2?"Pick two tiles to swap. Esc to cancel.":d.stamp?"Pick a tile to stamp. Esc to cancel.":"Pick a tile. Esc to cancel.",true); return; }
+  const targets=boardTargets(d);
+  if(targets>0){
+    target={idx:i,def:{...d,targets},picks:[]};$("board").classList.add("targeting");renderCons();syncTiles();
+    hint(d.id==='recast_item'?'Pick the tile to copy, then the tile to replace. Esc to cancel.':targets===2?'Pick two tiles to swap. Esc to cancel.':'Pick a tile. Esc to cancel.',true);return;
+  }
   let ok=true;
   if(d.id==="shuffle"){ shuffleBoard(); }
   else if(d.id==="purge"){ let k=0; allTiles().forEach(t=>{ if(t.v<=4 && t.id!==S.frozen){S.grid[t.r][t.c]=null;k++;} }); if(!k){ hint("Nothing to purge.",true); ok=false; } }
   else if(d.id==="undo"){ if(!undoSnap){ hint("Nothing to undo.",true); ok=false; } else { restore(undoSnap); undoSnap=null; } }
   else if(d.id==="jack"){ let k=0; allTiles().forEach(t=>{ if(t.rock&&!t.fixed){ S.grid[t.r][t.c]=null; k++; } }); if(!k){ hint("No rubble to clear.",true); ok=false; } }
-  else if(d.id==="clock"){ S.moves+=6; curRound().movesAllowed+=6; }
+  else if(d.id==="clock"){
+    if(S.phase==='shop')S.nextMoves=(S.nextMoves||0)+6;
+    else {S.moves+=6;curRound().movesAllowed+=6;}
+  }
   else if(d.id==="polish"){ S.polish=3; }
   if(!ok) return;
   finishCon(i);
@@ -858,22 +936,37 @@ function pickTile(t){
   if(!target) return;
   if(t.rock&&target.def.id!=="eraser"){ hint("Rubble only comes out with an Eraser or a Jackhammer.",true); return; }
   if(t.id===S.frozen){ hint("That tile is frozen.",true); return; }
+  if(target.def.id==='split_item'&&t.v<4){hint('Choose a tile of 4 or more.',true);return;}
   target.picks.push(t);
   if(target.picks.length<target.def.targets){ syncTiles(); return; }
   const d=target.def, [a,b]=target.picks;
   if(d.file){ retireTile(a); }
   else if(d.stamp){ a.enh=d.stamp; const e=els.get(a.id); if(e){ e.classList.remove("zap"); void e.offsetWidth; e.classList.add("zap"); } }
-  else if(d.id==="eraser"){ S.grid[a.r][a.c]=null; }
+  else if(d.id==="eraser"||d.id==='burn'){ S.grid[a.r][a.c]=null; }
   else if(d.id==="halve"){ if(a.v===2) S.grid[a.r][a.c]=null; else a.v/=2; }
-  else if(d.id==="double"){ a.v*=2; markMadeValue(a.v); }
+  else if(d.id==="double"||d.id==='promote'){ a.v*=2; markMadeValue(a.v); }
+  else if(d.id==='temper'){const keys=Object.keys(ENH);a.enh=keys[Math.floor(S.rng()*keys.length)];}
+  else if(d.id==='twin'||d.id==='split_item'){
+    const cells=emptyCells();if(!cells.length){hint('Needs an empty cell.',true);target.picks=[];return;}
+    if(d.id==='split_item')a.v/=2;
+    const [r,c]=cells[Math.floor(S.rng()*cells.length)];S.grid[r][c]={id:++tileId,v:a.v,enh:a.enh,r,c};
+  }
+  else if(d.id==='recast_item'){
+    if(a.id===b.id){target.picks=[a];hint('Pick a different tile to replace.',true);return;}
+    b.v=a.v;b.enh=a.enh;
+  }
   else if(d.id==="swap"){ if(a.id===b.id){ target.picks=[a]; hint("Pick a different second tile.",true); return; } S.grid[a.r][a.c]=b; S.grid[b.r][b.c]=a; const r=a.r,c=a.c; a.r=b.r;a.c=b.c;b.r=r;b.c=c; }
   const idx=target.idx; cancelTarget(); finishCon(idx);
 }
 function finishCon(i){
-  const d=S.cons[i]; S.cons.splice(i,1); S.consUsed++; curRound().moves.push({con:d.id}); log("Used <b>"+d.name+"</b>."); audio.effect("upgrade"); hint("");
+  const d=S.cons[i]; S.cons.splice(i,1); S.consUsed++;
+  if(S.phase==='shop')curShop().bought.push('used:'+d.id);else curRound().moves.push({con:d.id});
+  log("Used <b>"+d.name+"</b>."); audio.effect("upgrade"); hint("");
   S.charms.forEach(c=>{ if(c.onUseCon) c.onUseCon(c); });
-  ensureTiles(); syncTiles(); render(); undoSnap=null;
-  if(!canMove()) afterMove({total:0,steps:[]});
+  undoSnap=null;
+  if(S.phase==='round'){ensureTiles();syncTiles();render();if(!canMove())afterMove({total:0,steps:[]});}
+  else {renderShop();if(S.pendingJobPack)renderJobPack();}
+  saveT();
 }
 // ---------- permanent deck work ----------
 // Pack contents are used immediately; a Deluxe pack has two separate picks.
@@ -894,13 +987,20 @@ const EXPERIMENTS=[
  {id:'reforge',kind:'reforge',name:'Reforge',ico:'8',count:3,desc:'Turn 3 deck tiles into plain 8s. Their enhancements are removed.'},
 ];
 let deckJob=null;
+const EDIT_HAND_SIZE=8;
+function dealEditHand(){
+  const hand=S.deck.slice();
+  for(let i=hand.length-1;i>0;i--){const j=Math.floor(S.rng()*(i+1));[hand[i],hand[j]]=[hand[j],hand[i]];}
+  return hand.slice(0,EDIT_HAND_SIZE);
+}
+function packHand(){return (S.pendingJobPack?.hand||[]).filter(card=>S.deck.includes(card));}
 function recordDeckEdit(kind,before,after){
   S.deckEdits=(S.deckEdits||0)+1;
   const entry={kind,before,after,ante:S.ante,blind:BLINDS[S.blind].name};
   (T.deckEdits||=[]).push(entry);
   activeCharms().forEach(c=>{if(c.onDeckEdit)c.onDeckEdit(c,entry);});
 }
-function editReason(d){
+function editReason(d,hand=null){
   if(d.kind==='dividend'&&S.money<2)return 'Needs cash on hand';
   if(d.kind==='parcel'&&S.maxCons-S.cons.length<2)return 'Needs two empty item slots';
   if(d.kind==='pocket'&&S.maxCons>=5)return 'All five item slots unlocked';
@@ -908,7 +1008,11 @@ function editReason(d){
   if(d.kind==='remove'&&S.deck.length<=DECK_MIN) return 'Minimum deck size';
   if(d.kind==='smelt'&&S.deck.length<=DECK_MIN) return 'Needs at least 13 tiles';
   if(d.kind==='kiln'&&(S.kilnUses||0)>=3) return 'Kiln limit reached';
-  if(d.kind==='split'&&!S.deck.some(c=>c.v>=4)) return 'Needs a tile of 4 or more';
+  const cards=hand||S.deck;
+  if(d.kind==='split'&&!cards.some(c=>c.v>=4)) return 'No tile of 4 or more in this hand';
+  if(d.kind==='stamp'&&d.stamp&&!cards.some(c=>c.enh!==d.stamp))return 'Every tile already has '+ENH[d.stamp].name;
+  if(d.kind==='halve'&&!cards.some(c=>c.v>2||S.deck.length>DECK_MIN))return 'Cannot remove a tile at minimum deck size';
+  if(d.count!==0&&cards.length<(d.kind==='remove'?1:d.count||1))return 'Not enough tiles left in this hand';
   return '';
 }
 function openJobPack(pack){
@@ -917,7 +1021,7 @@ function openJobPack(pack){
   for(let i=pool.length-1;i>0;i--){const j=Math.floor(S.rng()*(i+1));[pool[i],pool[j]]=[pool[j],pool[i]];}
   const price=packPrice(pack);
   S.money-=price;pack.sold=true;
-  S.pendingJobPack={pack,kind:pack.kind,price,options:pool.slice(0,packCardCount(pack)),remaining:PACK_SIZES[pack.size].picks,taken:[]};
+  S.pendingJobPack={pack,kind:pack.kind,price,options:pool.slice(0,packCardCount(pack)),remaining:PACK_SIZES[pack.size].picks,taken:[],hand:dealEditHand()};
   curShop().bought.push('pack:'+pack.kind+':'+pack.size);audio.effect('pack');
   renderShop();renderJobPack();juice?.pack($('packgrid'),packName(pack).toUpperCase());saveT();
 }
@@ -928,13 +1032,17 @@ function renderJobPack(){
   $('packnote').textContent='Choose '+remaining+' more. Effects are included in the price. No refunds.';
   const g=$('packgrid');g.innerHTML='';g.classList.toggle('expanded',options.length>3);
   options.forEach(d=>{
-    const used=taken.includes(d.id),reason=editReason(d),el=document.createElement('button');el.className='opt job-opt'+(used?' taken':'');
+    const used=taken.includes(d.id),reason=editReason(d,packHand()),el=document.createElement('button');el.className='opt job-opt'+(used?' taken':'');
     el.innerHTML='<div class="job-opt-mark">'+d.ico+'</div><div class="nm">'+d.name+'</div><div class="ds">'+d.desc+'</div><small class="pack-tag">'+(used?'Used':reason||(kind==='workshop'?'WORKSHOP':'BACKROOM'))+'</small>';
     el.disabled=used||!!reason;
-    el.onclick=()=>{if(S.pendingJobPack!==pending||taken.includes(d.id))return;hide('ov-pack');beginDeckJob(d,{source,price:0});};
+    el.onclick=()=>{if(S.pendingJobPack!==pending||taken.includes(d.id))return;beginDeckJob(d,{source,price:0,hand:packHand()});};
     g.appendChild(el);
   });
   $('btnpackskip').textContent=taken.length?'Leave the rest':'Skip pack';
+  $('packworkbench').hidden=false;
+  const hand=packHand(),tray=$('packhand');tray.innerHTML='';hand.forEach(card=>tray.appendChild(miniTile(card)));
+  $('packhandnote').textContent=hand.length+' of '+S.deck.length+' tiles';
+  renderItemRack($('packcons'),'pack');
   show('ov-pack');
 }
 function cancelDeckJob(){
@@ -942,8 +1050,9 @@ function cancelDeckJob(){
   if(S.pendingJobPack)renderJobPack();
 }
 function beginDeckJob(def,options={}){
-  const reason=editReason(def);if(reason){hint(reason,true);return;}
-  deckJob={def,source:options.source||'item',idx:options.idx,price:options.price||0,picks:[],enh:def.stamp||null};
+  const hand=options.hand||packHand();
+  const reason=editReason(def,hand);if(reason){hint(reason,true);return;}
+  deckJob={def,source:options.source||'item',idx:options.idx,price:options.price||0,picks:[],enh:def.stamp||null,hand};
   renderDeckJob();show('ov-deckedit');
 }
 function renderDeckJob(){
@@ -953,7 +1062,7 @@ function renderDeckJob(){
   if(d.count===0){
     $('editstep').textContent='Use now';$('editenh').hidden=true;$('editgrid').innerHTML='';
     $('editpreview').textContent=d.kind==='dividend'?'Collect $'+Math.min(12,Math.floor(Math.max(0,S.money)/2))+'.':d.kind==='pocket'?'Item slots: '+S.maxCons+' → '+(S.maxCons+1)+'.':d.kind==='tickets'?'Add 2 free reroll tickets.': 'Open the parcel for two different board tools.';
-    $('editcount').textContent='Run upgrade';$('btneditapply').textContent='Use';$('btneditapply').disabled=!!editReason(d);return;
+    $('editcount').textContent='Run upgrade';$('btneditapply').textContent='Use';$('btneditapply').disabled=!!editReason(d,job.hand);return;
   }
   const need=d.count||(d.kind==='replace'?2:1);
   $('editstep').textContent=d.kind==='replace'?(picks.length===0?'1 / Choose the tile to copy.':picks.length===1?'2 / Choose the tile to replace.':'Review your conversion.'):
@@ -965,9 +1074,10 @@ function renderDeckJob(){
     button.onclick=()=>{job.enh=id;renderDeckJob();};enh.appendChild(button);
   });
   const grid=$('editgrid');grid.innerHTML='';
-  S.deck.forEach((card,i)=>{
+  job.hand.filter(card=>S.deck.includes(card)).forEach(card=>{
+    const i=S.deck.indexOf(card);
     const selected=picks.indexOf(i),b=document.createElement('button');b.className='edit-tile'+(selected>=0?' selected':'');
-    const ineligible=(d.kind==='split'&&card.v<4)||(d.kind==='remove'&&picks.length>=Math.min(need,S.deck.length-DECK_MIN)&&selected<0);
+    const ineligible=(d.kind==='split'&&card.v<4)||(d.kind==='stamp'&&card.enh===job.enh)||(d.kind==='halve'&&card.v===2&&S.deck.length<=DECK_MIN)||(d.kind==='remove'&&picks.length>=Math.min(need,S.deck.length-DECK_MIN)&&selected<0);
     b.disabled=ineligible;
     b.setAttribute('aria-pressed',String(selected>=0));b.setAttribute('aria-label',(card.enh?ENH[card.enh].name+' ':'')+card.v+', tile '+(i+1)+(selected>=0?', selected '+(selected+1):''));
     b.appendChild(miniTile(card));
@@ -992,16 +1102,18 @@ function renderDeckJob(){
     else if(d.kind==='split')preview.textContent=name(cards[0])+' → two '+name({...cards[0],v:cards[0].v/2})+' tiles.';
     else if(d.kind==='reforge')preview.textContent='Replace all 3 selected tiles with plain 8s.';
     else if(d.kind==='promote')preview.textContent=name(cards[0])+' → '+name({...cards[0],v:cards[0].v*2})+'.';
+    else if(d.kind==='halve')preview.textContent=cards[0].v===2?'Remove '+name(cards[0])+'.':name(cards[0])+' → '+name({...cards[0],v:cards[0].v/2})+'.';
     else preview.textContent='Give '+name(cards[0])+' a random enhancement.';
   }else preview.textContent=d.kind==='stamp'&&!job.enh?'Choose an enhancement and a tile.':'Choose your tiles above.';
-  $('btneditapply').disabled=!valid||!!editReason(d)||S.money-job.price<moneyFloor();
+  $('btneditapply').disabled=!valid||!!editReason(d,job.hand)||S.money-job.price<moneyFloor();
   $('btneditapply').textContent='Apply'+(job.price?' · $'+job.price:'');
-  $('editcount').textContent=S.deck.length+' / '+DECK_CAP+' tiles · minimum '+DECK_MIN;
+  $('editcount').textContent=job.hand.filter(c=>S.deck.includes(c)).length+' tiles dealt · '+S.deck.length+' in deck';
 }
 function applyDeckJob(){
   const job=deckJob;if(!job||$('btneditapply').disabled)return;
   const d=job.def,indices=job.picks,cards=indices.map(i=>({...S.deck[i]})),before=deckSummary();
-  if(editReason(d)||S.money-job.price<moneyFloor())return;
+  if(editReason(d,job.hand)||S.money-job.price<moneyFloor())return;
+  if(d.count!==0&&(!indices.length||indices.some(i=>!job.hand.includes(S.deck[i]))||new Set(indices).size!==indices.length))return;
   if(d.kind==='dividend')S.money+=Math.min(12,Math.floor(Math.max(0,S.money)/2));
   else if(d.kind==='pocket')S.maxCons++;
   else if(d.kind==='tickets')S.rerollTickets=(S.rerollTickets||0)+2;
@@ -1009,16 +1121,17 @@ function applyDeckJob(){
     const tools=CONS.filter(c=>['eraser','halve','swap','shuffle','purge','clock','jack'].includes(c.id));
     for(let i=0;i<2;i++){const j=Math.floor(S.rng()*tools.length);S.cons.push({...tools.splice(j,1)[0]});}
   }
-  else if(d.kind==='replace')S.deck[indices[1]]={...cards[0]};
+  else if(d.kind==='replace')Object.assign(S.deck[indices[1]],cards[0]);
   else if(d.kind==='remove')indices.slice().sort((a,b)=>b-a).forEach(i=>S.deck.splice(i,1));
   else if(d.kind==='clone')S.deck.push({...cards[0]});
   else if(d.kind==='stamp')S.deck[indices[0]].enh=d.stamp||job.enh;
   else if(d.kind==='promote')S.deck[indices[0]].v*=2;
+  else if(d.kind==='halve'){if(cards[0].v===2)S.deck.splice(indices[0],1);else S.deck[indices[0]].v/=2;}
   else if(d.kind==='random'){const keys=Object.keys(ENH);S.deck[indices[0]].enh=keys[Math.floor(S.rng()*keys.length)];}
   else if(d.kind==='kiln'){indices.forEach(i=>S.deck[i].enh='glass');S.bonusMoves-=2;S.kilnUses=(S.kilnUses||0)+1;}
   else if(d.kind==='smelt'){indices.slice().sort((a,b)=>b-a).forEach(i=>S.deck.splice(i,1));S.deck.push({v:8,enh:'steel'});}
   else if(d.kind==='split'){S.deck[indices[0]].v/=2;S.deck.push({...S.deck[indices[0]]});}
-  else if(d.kind==='reforge')indices.forEach(i=>S.deck[i]={v:8,enh:null});
+  else if(d.kind==='reforge')indices.forEach(i=>Object.assign(S.deck[i],{v:8,enh:null}));
   S.money-=job.price;
   if(job.source.endsWith('-pack')){
     S.pendingJobPack.taken.push(d.id);S.pendingJobPack.remaining--;
@@ -1030,14 +1143,14 @@ function applyDeckJob(){
   }
   if(S.phase==='shop')curShop().bought.push((job.source==='item'?'used:':job.source+':')+d.id);
   if(d.count!==0)recordDeckEdit(d.id,before,deckSummary());
-  else {S.consUsed++;S.charms.forEach(c=>{if(c.onUseCon)c.onUseCon(c);});}
+  else if(job.source!=='item'){S.consUsed++;S.charms.forEach(c=>{if(c.onUseCon)c.onUseCon(c);});}
   log('<b>'+d.name+'</b>: '+$('editpreview').textContent);
   deckJob=null;undoSnap=null;if(d.count!==0)reshuffle();hide('ov-deckedit');audio.effect('upgrade');
-  render();if(S.phase==='shop')renderShop();if(S.pendingJobPack)renderJobPack();saveT();
+  render();if(S.phase==='shop')renderShop();if(S.pendingJobPack)renderJobPack();else hide('ov-pack');saveT();
 }
 function openDeckPick(i,d){
-  const kinds={promote:'promote',twin:'clone',burn:'remove',temper:'random',recast_item:'replace',split_item:'split'};
-  beginDeckJob({...d,kind:d.stamp?'stamp':kinds[d.id],count:d.id==='recast_item'?2:1},{source:'item',idx:i});
+  if(!S.pendingJobPack)return;
+  const def=deckDef(d);if(def)beginDeckJob(def,{source:'item',idx:i,hand:packHand()});
 }
 $('btneditapply').onclick=applyDeckJob;
 $('btneditcancel').onclick=cancelDeckJob;
@@ -1194,7 +1307,8 @@ function renderCons(){
   if(!S.cons.length) t.innerHTML="<div class='empty'>No items. Find them in the shop.</div>";
   S.cons.forEach((c,i)=>{
     const el=document.createElement("button"); el.className="card use"+(target&&target.idx===i?" armed":"");
-    el.innerHTML="<div class='ico'>"+c.ico+"</div><div><div class='t'>"+c.name+"</div><div class='d'>"+c.desc+"</div></div>";
+    el.disabled=!!conReason(c,'board');
+    el.innerHTML="<div class='ico'>"+c.ico+"</div><div><div class='t'>"+c.name+"</div><div class='d'>"+conDescription(c,'board')+"</div></div>";
     el.onclick=()=>useCon(i); t.appendChild(el);
   });
   if(S.polish>0){ const p=document.createElement("div"); p.className="empty"; p.style.borderColor="var(--purple)"; p.style.color="var(--purple)"; p.textContent="Polish: ×2 mult for "+S.polish+" more scoring moves"; t.appendChild(p); }
@@ -1341,6 +1455,6 @@ document.querySelectorAll('.ov').forEach(ov=>{
   ov.setAttribute('role','dialog');ov.setAttribute('aria-modal','true');
   const heading=ov.querySelector('h1,h2');if(heading){heading.id||=ov.id+'-title';ov.setAttribute('aria-labelledby',heading.id);}
 });
-syncScreens();refreshAudio();showStats();
+ensureShopLayout();syncScreens();refreshAudio();showStats();
 
 })();
