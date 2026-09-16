@@ -1,6 +1,6 @@
 (function(){
 "use strict";
-const VERSION="1.7.0";
+const VERSION="1.8.0";
 const STORAGE = new URLSearchParams(location.search).has("qa") ? "ante2048.qa." : "ante2048.";
 const escapeHTML = s => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]);
 const $ = id => document.getElementById(id);
@@ -34,6 +34,16 @@ const ENH={
  lucky:{ico:"★",name:"Odds",desc:"1 in 4: +8 mult. 1 in 12: +$4."},
 };
 
+const FIXTURES={
+ press:{name:'Press',ico:'▤',price:6,desc:'Merge here for +20 chips.'},
+ flywheel:{name:'Flywheel',ico:'◴',price:8,desc:'Each move without a merge here stores 10 chips, up to 60. Merge here to collect them.'},
+ toll:{name:'Toll Booth',ico:'$│',price:8,limit:2,desc:'The first 2 merges here each round pay $1 each.'},
+ copier:{name:'Copy Desk',ico:'Ⅱ',price:10,limit:1,desc:'Once per round, merge here into 32 or less to spawn a plain copy in an empty cell.'},
+ inkwell:{name:'Inkwell',ico:'✦',price:9,limit:1,desc:'Once per round, a plain tile made here gains a random finish. It takes effect on later moves.'},
+ trapdoor:{name:'Trapdoor',ico:'⌄',price:10,limit:2,desc:'Twice per round, a merge of 16 or more here gives ×1.6 mult, then removes the result from the board.'},
+ switchboard:{name:'Switchboard',ico:'↱',price:7,desc:'Merge here for +4 mult if the direction differs from the last merge here. The first hit primes it.'},
+};
+
 // Different finishes can react once per pairing per move. The tile still
 // keeps one finish, so the board remains readable and bonuses cannot stack forever.
 const REACTIONS=[
@@ -48,6 +58,12 @@ function reactionFor(enhs){return REACTIONS.find(d=>d.pair.every(e=>enhs.include
 
 // Charm hooks. `me` is the owned instance ({...def, st:{}, sell}). ctx.add(me, {chips|mult|xmult}) records a scoring step.
 const CHARMS=[
+ {id:'foreman',ico:'▤+',name:'Foreman',rar:'u',price:6,desc:'<em>+3 mult</em> per board fixture activated this move.',score:(ctx,me)=>{if(ctx.fixtureHits?.length)ctx.add(me,{mult:3*ctx.fixtureHits.length});}},
+ {id:'live_circuit',ico:'⚡',name:'Live Circuit',rar:'r',price:8,desc:'Activate <em>2 different fixtures</em> in one move for <em>×2 mult</em>.',score:(ctx,me)=>{if(ctx.fixtureHits?.length>=2)ctx.add(me,{xmult:2});}},
+ {id:'field_notes',ico:'▧',name:'Field Notes',rar:'u',price:5,desc:'Gains <em>+2 mult</em> whenever you install a fixture. Moving one does not count. Caps at +12. <span class="st">Now +{m}</span>',st:{m:0},onInstall:me=>{me.st.m=Math.min(12,me.st.m+2);},score:(ctx,me)=>{if(me.st.m)ctx.add(me,{mult:me.st.m});}},
+ {id:'compass',ico:'↔↕',name:'Compass',rar:'c',price:5,desc:'<em>+6 mult</em> when a scoring move changes from horizontal to vertical, or vice versa.',st:{axis:null},score:(ctx,me)=>{const axis=['left','right'].includes(S.mom.dir)?'h':'v';if(me.st.axis&&me.st.axis!==axis)ctx.add(me,{mult:6});if(!ctx.as)me.st.axis=axis;},roundStart:me=>{me.st.axis=null;}},
+ {id:'clean_cut',ico:'□',name:'Clean Cut',rar:'c',price:4,desc:'<em>+20 chips</em> per merge of two plain tiles. Up to +60 per move.',score:(ctx,me)=>{const n=ctx.merges.filter(m=>!m.enhs.length).length;if(n)ctx.add(me,{chips:Math.min(60,n*20)});}},
+ {id:'surveyor',ico:'⌗',name:'Surveyor',rar:'u',price:6,desc:'<em>+8 mult</em> if your merges land in at least 2 different rows <em>and</em> 2 different columns.',score:(ctx,me)=>{if(new Set(ctx.merges.map(m=>m.r)).size>=2&&new Set(ctx.merges.map(m=>m.c)).size>=2)ctx.add(me,{mult:8});}},
  {id:"carbon_press",ico:"Ⅱ",name:"Carbon Press",rar:"u",price:7,desc:"First scoring move each round: if it makes exactly one tile of 64 or less, pay <em>$2</em> to copy it into your deck. Needs a free slot.",st:{ready:true},roundStart:me=>{me.st.ready=true;},score:(ctx,me)=>{
    if(!me.st.ready||ctx.as)return;me.st.ready=false;
    const m=ctx.merges[0];if(ctx.merges.length!==1||m.v>64||S.deck.length>=DECK_CAP||S.money<2)return;
@@ -187,6 +203,10 @@ const CHARMS=[
  {id:"alchemist",ico:"++",name:"Catalyst",rar:"r",price:8,desc:"When two <em>enhanced</em> tiles merge, the new tile fires both enhancements <em>again</em>."},
 ];
 const CONS=[
+ {id:'grease',ico:'≈',name:'Grease',price:3,desc:'Pause the rubble clock for your next 4 moves. Unused moves carry over.',targets:0},
+ {id:'hotwire',ico:'⚡',name:'Hot Wire',price:3,desc:'Your next 3 moves that activate a fixture get +20 chips.',targets:0},
+ {id:'wrench',ico:'⌁',name:'Wrench',price:3,desc:'Move one fixture to another cell. Keeps its charge and uses left.',targets:0},
+ {id:'stack',ico:'↓Ⅲ',name:'Stack',price:2,desc:'Choose one of your next 3 draws and send it to the bottom of the pile.',targets:0},
  {id:"recast_item",ico:"⇒",name:"Mould",price:5,desc:"Turn one tile into an exact copy of another.",deck:true},
  {id:"split_item",ico:"½",name:"Wedge",price:4,desc:"Split a tile into two halves. Both keep its enhancement. Needs a free slot.",deck:true},
  {id:"eraser",ico:"−",name:"Eraser",price:3,desc:"Remove one tile.",targets:1},
@@ -212,6 +232,7 @@ const CONS=[
  {id:"temper",ico:"✦",name:"Temper",price:5,desc:"Give one tile a random enhancement.",deck:true},
 ];
 const VOUCHERS=[
+ {id:'extension',ico:'▦+',name:'Extension Lead',price:10,desc:'Fit a fourth board fixture. Every fixture still needs its own cell.',max:1,apply:()=>{S.maxFixtures=4;}},
  {id:"overclock",ico:"+4",name:"Overclock",price:8,desc:"+4 moves every round. Stacks up to three times.",max:3,apply:()=>{S.bonusMoves+=4;}},
  {id:"purse",ico:"$+",name:"Bigger Purse",price:8,desc:"Interest cap rises by $2.",max:2,apply:()=>{S.interestCap+=2;}},
  {id:"slot",ico:"Ⅵ",name:"Sixth Slot",price:12,desc:"One more charm slot.",max:1,apply:()=>{S.maxCharms++;}},
@@ -238,7 +259,7 @@ const BOSSES=[
 ];
 
 // ---------- state ----------
-let queuedDirection=null;
+let queuedDirection=null,boardJob=null;
 let S=null, els=new Map(), locked=false, tileId=0, target=null, undoSnap=null, revealTimer=[], T=null, pendingReveal=null;
 
 function newDeck(){ const d=[]; for(let i=0;i<16;i++) d.push({v:2,enh:null}); for(let i=0;i<4;i++) d.push({v:4,enh:null}); return d; }
@@ -310,7 +331,9 @@ function newRun(seedStr){
       charms:[], cons:[], boss:null, frozen:null, mom:{dir:null,count:0}, polish:0, ghostUsed:false, consUsed:0, freeReroll:false,
       usedBosses:[], phase:"start", chain:0, banked:false, blewIt:false, movesMade:0, quota:0, quotaMet:false, shop:null, rerollCost:5, roundsWon:0, totalScore:0, bestMove:0, endless:false,
       maxCharms:MAX_CHARMS, maxCons:MAX_CONS, interestCap:5, bonusMoves:0, rerollDisc:0, vouchers:[], voucher:null,
-      deck:null, pile:[], packSize:3, packDisc:0, trims:0, retirePerRound:1, retireLeft:0, retired:[], madeValues:{} };
+      deck:null, pile:[], packSize:3, packDisc:0, trims:0, retirePerRound:1, retireLeft:0, retired:[], madeValues:{},
+      fixtures:[],maxFixtures:3,grease:0,hotwire:0,boardOffer:null,shopRound:null };
+  boardJob=null;deckJob=null;
   S.deck=newDeck(); reshuffle();
   S.grid=Array.from({length:4},()=>Array(4).fill(null));
   els.forEach(e=>e.remove()); els.clear();
@@ -370,6 +393,7 @@ function deckSummary(){ const m={}; S.deck.forEach(c=>{ const k=(c.enh?c.enh+" "
 function startRound(){
   audio.setScene(S.blind===2?"boss":"round");
   S.phase="round"; S.score=0; S.frozen=null; S.ghostUsed=false; S.mom={dir:null,count:0}; undoSnap=null;
+  S.fixtures.forEach(f=>{f.uses=0;f.charge=0;f.dir=null;f.firedAt=-1;});
   S.boss = S.blind===2 ? pickBoss() : null;
   S.target=targetFor(S.ante,S.blind);
   S.grid=Array.from({length:S.N},()=>Array(S.N).fill(null));
@@ -383,7 +407,7 @@ function startRound(){
   S.moves=roundMoves()+(S.nextMoves||0); S.nextMoves=0; S.moveCap=S.moves; S.rubbleIn=rubbleEvery();
   if(S.boss && S.boss.id==="freeze"){ const t=allTiles(); const pick=t[Math.floor(S.rng()*t.length)]; S.frozen=pick.id; }
   T.rounds.push({ante:S.ante,blind:BLINDS[S.blind].name,boss:S.boss?S.boss.id:null,target:S.target,movesAllowed:S.moves,moneyStart:S.money,
-    boardStart:boardValues(),charms:S.charms.map(c=>c.id),cons:S.cons.map(c=>c.id),vouchers:S.vouchers.slice(),deck:deckSummary(),deckAvg:deckAvg(),moves:[],result:null});
+    boardStart:boardValues(),charms:S.charms.map(c=>c.id),cons:S.cons.map(c=>c.id),vouchers:S.vouchers.slice(),deck:deckSummary(),deckAvg:deckAvg(),fixtures:S.fixtures.map(f=>({kind:f.kind,r:f.r,c:f.c})),moves:[],result:null});
   syncTiles(); render(); calcIdle();
   log("<b>Ante "+S.ante+" · "+BLINDS[S.blind].name+"</b> — target "+fmt(S.target)+".");
   if(S.boss){
@@ -459,7 +483,8 @@ function move(dir){
     const spawns=(S.boss&&S.boss.id==="flood")?2:1;
     for(let i=0;i<spawns;i++) spawn();
     S.movesMade++;
-    if(--S.rubbleIn<=0){ S.rubbleIn=rubbleEvery(); const rk=spawnRock(false); if(rk){ log("Rubble fell."); audio.effect("rubble"); } }
+    if(S.grease>0)S.grease--;
+    else if(--S.rubbleIn<=0){ S.rubbleIn=rubbleEvery(); const rk=spawnRock(false); if(rk){ log("Rubble fell."); audio.effect("rubble"); } }
     syncTiles();
     const result=score(res.merges,maxBefore);
     locked=false;
@@ -470,6 +495,7 @@ function move(dir){
 }
 function score(merges,maxBefore){
   const rec={dir:S.mom.dir[0],merges:merges.map(m=>m.v),chips:0,mult:1,total:0,movesLeft:S.moves};
+  S.fixtures.forEach(f=>{if(f.kind==='flywheel'&&!merges.some(m=>m.r===f.r&&m.c===f.c))f.charge=Math.min(60,f.charge+10);});
   if(!merges.length){ S.chain=0; activeCharms().forEach(c=>{ if(c.noscore) c.noscore(c); }); calcNone(); curRound().moves.push(rec); return {total:0,steps:[]}; }
   S.chain++;
   if(S.quota&&merges.some(m=>m.v>=S.quota)) S.quotaMet=true;
@@ -537,6 +563,8 @@ function score(merges,maxBefore){
     ctx.steps.push(step);juice?.reaction(els.get(m.tile.id),d.name);
   });
   if(reactions.length){rec.reactions=reactions.map(x=>x.d.id);audio.effect('reaction');}
+  scoreFixtures(ctx);
+  if(ctx.fixtureHits.length)rec.fixtures=ctx.fixtureHits.map(f=>f.kind+'@'+(f.r+1)+','+(f.c+1));
   activeCharms().slice().forEach(c=>{ if(c.score) c.score(ctx,c); });
   if(S.polish>0){ ctx.xmult*=2; S.polish--; ctx.steps.push({name:"Polish",chips:0,mult:0,xmult:2}); }
   if(S.boss&&S.boss.id==="tax"){ ctx.xmult*=0.5; ctx.steps.push({name:"The Tax",chips:0,mult:0,xmult:0.5}); }
@@ -547,6 +575,80 @@ function score(merges,maxBefore){
   shatterList.forEach(t=>{ if(t.id!==S.frozen && S.grid[t.r]&&S.grid[t.r][t.c]===t){ S.grid[t.r][t.c]=null; ctx.steps.push({name:"Prism",tid:t.id,txt:"shattered "+t.v+"!",shatter:true}); const e=els.get(t.id); if(e){ e.classList.add("shatter"); setTimeout(()=>{ e.remove(); els.delete(t.id); },450); } } });
   if(ctx.dirty) syncTiles();
   return {total,steps:ctx.steps,chips:ctx.chips,mult};
+}
+
+// Fixtures belong to cells, not tiles. Their effects run after tile finishes
+// and before charms; new tiles never join the current move's merge list.
+function scoreFixtures(ctx){
+  ctx.fixtureHits=[];
+  S.fixtures.forEach(f=>{
+    const d=FIXTURES[f.kind],m=ctx.merges.find(m=>m.r===f.r&&m.c===f.c);
+    if(!m||(d.limit&&f.uses>=d.limit))return;
+    const step={name:d.name+' ['+(f.r+1)+','+(f.c+1)+']',tid:m.tile.id};
+    if(f.kind==='press')step.chips=20;
+    else if(f.kind==='flywheel'){
+      if(!f.charge)return;step.chips=f.charge;f.charge=0;
+    }
+    else if(f.kind==='toll'){S.money++;step.txt='+$1';}
+    else if(f.kind==='copier'){
+      const cells=emptyCells();if(m.v>32||!cells.length)return;
+      const [r,c]=cells[Math.floor(S.rng()*cells.length)];S.grid[r][c]={id:++tileId,v:m.v,enh:null,r,c};
+      step.txt='spawned a plain '+m.v;ctx.dirty=true;
+    }
+    else if(f.kind==='inkwell'){
+      if(m.tile.enh||S.grid[f.r][f.c]!==m.tile)return;
+      const keys=Object.keys(ENH);m.tile.enh=keys[Math.floor(S.rng()*keys.length)];
+      step.txt='added '+ENH[m.tile.enh].name;ctx.dirty=true;
+    }
+    else if(f.kind==='trapdoor'){
+      if(m.v<16)return;
+      if(S.grid[f.r][f.c]===m.tile)S.grid[f.r][f.c]=null;
+      step.xmult=1.6;ctx.dirty=true;
+    }
+    else if(f.kind==='switchboard'){
+      const changed=f.dir&&f.dir!==S.mom.dir;f.dir=S.mom.dir;
+      if(!changed){ctx.steps.push({...step,txt:'primed '+S.mom.dir});return;}
+      step.mult=4;
+    }
+    f.uses++;f.firedAt=S.movesMade;ctx.fixtureHits.push(f);
+    if(step.chips)ctx.chips+=step.chips;
+    if(step.mult)ctx.mult+=step.mult;
+    if(step.xmult)ctx.xmult*=step.xmult;
+    ctx.steps.push(step);
+  });
+  if(ctx.fixtureHits.length&&S.hotwire>0){S.hotwire--;ctx.chips+=20;ctx.steps.push({name:'Hot Wire',chips:20});}
+  ctx.empty=emptyCells().length;
+}
+function fixtureAt(r,c){return S.fixtures.find(f=>f.r===r&&f.c===c);}
+function fixtureStatus(f){
+  const d=FIXTURES[f.kind];
+  if(d.limit)return Math.max(0,d.limit-f.uses)+' / '+d.limit+' left';
+  if(f.kind==='flywheel')return f.charge+' / 60 chips';
+  if(f.kind==='switchboard')return f.dir?'last: '+f.dir:'unprimed';
+  return '+20 chips';
+}
+function fixtureSummary(){return S.fixtures.map(f=>FIXTURES[f.kind].name+' ['+(f.r+1)+','+(f.c+1)+']').join(', ')||'none';}
+function renderFixtureBoard(){
+  [...$('cells').children].forEach((cell,i)=>{
+    const f=fixtureAt(Math.floor(i/S.N),i%S.N);cell.textContent=f?FIXTURES[f.kind].ico:'';
+    if(f){cell.dataset.fixture=f.kind;cell.title=FIXTURES[f.kind].name+': '+fixtureStatus(f);}else{delete cell.dataset.fixture;cell.removeAttribute('title');}
+  });
+  allTiles().forEach(t=>{
+    const e=els.get(t.id);if(!e)return;
+    e.querySelector('.socket-mark')?.remove();
+    e.setAttribute('aria-label',e.title+', row '+(t.r+1)+', column '+(t.c+1));
+    const f=fixtureAt(t.r,t.c);if(!f)return;
+    const d=FIXTURES[f.kind],tag=document.createElement('span');tag.className='socket-mark';tag.textContent=d.ico;
+    tag.dataset.spent=String(!!d.limit&&f.uses>=d.limit);tag.dataset.fired=String(S.phase==='round'&&f.firedAt===S.movesMade);tag.title=d.name+' · '+fixtureStatus(f);e.appendChild(tag);
+    e.setAttribute('aria-label',e.title+'; on '+d.name+', '+fixtureStatus(f));
+  });
+  const hud=$('fixturehud');hud.innerHTML='';hud.hidden=!S.fixtures.length;
+  S.fixtures.forEach(f=>{
+    const d=FIXTURES[f.kind],label=document.createElement('button');label.className='fixture-label';label.title=d.desc;label.dataset.fired=String(S.phase==='round'&&f.firedAt===S.movesMade);
+    label.innerHTML='<b>'+d.ico+' '+d.name+'</b><small>'+(f.r+1)+','+(f.c+1)+' · '+fixtureStatus(f)+'</small>';
+    label.onclick=()=>{ $('inspectname').textContent=d.name;$('inspecticon').textContent=d.ico;$('inspectrarity').textContent='Board fixture · '+(f.r+1)+','+(f.c+1);$('inspectdesc').textContent=d.desc+' '+fixtureStatus(f)+'. Charges reset each round.';show('ov-inspect'); };
+    hud.appendChild(label);
+  });
 }
 
 // ---------- the receipt reveal ----------
@@ -611,10 +713,12 @@ function afterMove(result){
     gameOver(S.quota&&!S.quotaMet&&S.score>=S.target ? "You hit the score but never built a "+S.quota+"." : S.moves<=0 ? "Out of moves. You scored "+fmt(S.score)+" of "+fmt(S.target)+"." : "No legal moves. The board locked up at "+fmt(S.score)+" of "+fmt(S.target)+".");
   }
 }
-function snapshot(){ return {grid:S.grid.map(row=>row.map(t=>t?{...t}:null)),score:S.score,moves:S.moves,money:S.money,madeValues:{...S.madeValues},mom:{...S.mom},polish:S.polish,pile:S.pile.map(c=>({...c})),charmSt:S.charms.map(c=>JSON.stringify(c.st))}; }
+function snapshot(){ return {grid:S.grid.map(row=>row.map(t=>t?{...t}:null)),score:S.score,moves:S.moves,money:S.money,madeValues:{...S.madeValues},mom:{...S.mom},polish:S.polish,fixtures:S.fixtures.map(f=>({...f})),grease:S.grease,hotwire:S.hotwire,rubbleIn:S.rubbleIn,movesMade:S.movesMade,chain:S.chain,pile:S.pile.map(c=>({...c})),charmSt:S.charms.map(c=>JSON.stringify(c.st))}; }
 function restore(sn){
   S.grid=sn.grid.map(row=>row.map(t=>t?{...t}:null)); S.score=sn.score; S.moves=sn.moves; S.money=sn.money; S.madeValues={...sn.madeValues}; S.mom={...sn.mom}; S.polish=sn.polish; S.pile=sn.pile.map(c=>({...c}));
   S.charms.forEach((c,i)=>{ if(sn.charmSt[i]) c.st=JSON.parse(sn.charmSt[i]); });
+  S.fixtures=sn.fixtures.map(f=>({...f}));S.grease=sn.grease;S.hotwire=sn.hotwire;
+  S.rubbleIn=sn.rubbleIn;S.movesMade=sn.movesMade;S.chain=sn.chain;
   curRound().moves.push({undo:true});
   syncTiles(); render(); calcIdle();
 }
@@ -696,11 +800,15 @@ function openShop(){
   ensureShopLayout();
   audio.setScene("shop");
   S.pendingJobPack=null; S.pendingTilePack=null;
-  if(S.phase!=="shop"){
+  if(S.shopRound!==S.ante+':'+S.blind){
     S.phase="shop"; S.rerollCost=Math.max(1,5-S.rerollDisc); S.freeReroll=has("chaos"); rollShop(); pickVoucher();
     S.packs=rollPacks();
+    const kinds=Object.keys(FIXTURES);S.boardOffer={kind:kinds[Math.floor(S.rng()*kinds.length)],sold:false};
+    S.shopRound=S.ante+':'+S.blind;
     T.shops.push({afterAnte:S.ante,afterBlind:BLINDS[S.blind].name,money:S.money,offered:S.shop.map(i=>i.def.id).concat(S.voucher?["v:"+S.voucher.def.id]:[]).concat(S.packs.map(p=>'pack:'+p.kind+':'+p.size)),bought:[],sold:[],rerolls:0});
+    curShop().offered.push('fixture:'+S.boardOffer.kind);
   }
+  S.phase='shop';
   const nb=S.blind+1>2?0:S.blind+1, na=nb===0?S.ante+1:S.ante;
   $("shopnext").innerHTML="Next: <b>Ante "+na+" · "+BLINDS[nb].name+"</b>, target "+fmt(targetFor(na,nb))+".";
   renderShop(); show("ov-shop");
@@ -726,6 +834,109 @@ function ensureShopLayout(){
     section.innerHTML='<h3>On the table <span id="packhandnote"></span></h3><div class="pack-hand" id="packhand"></div><p class="hand-note">These are the tiles you can edit. Both picks use the same hand.</p><h3>Your items</h3><div class="item-rack" id="packcons"></div>';
     $('packgrid').after(section);
   }
+  ensureBoardWorkshop();
+}
+function ensureBoardWorkshop(){
+  if(!$('boardstock')){
+    const section=document.createElement('div');section.className='shopsec board-stock-section';
+    section.innerHTML='<h3>Board work <span id="boardstockcount"></span></h3><div id="boardstock"></div><p class="hand-note">Fixtures stay on their cells between rounds. One offer per shop. Replacing one gives no refund.</p>';
+    $('voucherbox').closest('.shopsec').before(section);
+  }
+  if(!$('fixturehud')){
+    const hud=document.createElement('div');hud.id='fixturehud';hud.className='fixture-hud';hud.hidden=true;$('bankbar').before(hud);
+  }
+  if(!$('ov-boardwork')){
+    const modal=document.createElement('div');modal.className='ov over';modal.id='ov-boardwork';
+    modal.setAttribute('role','dialog');modal.setAttribute('aria-modal','true');modal.setAttribute('aria-labelledby','boardworktitle');
+    modal.innerHTML='<div class="modal board-workshop"><span class="eyebrow">BOARD WORKSHOP</span><h2 id="boardworktitle"></h2><p id="boardworkdesc"></p><div class="board-plan" id="boardplan"></div><p class="edit-preview" id="boardworkpreview" aria-live="polite"></p><div class="btnrow"><button class="btn ghost" id="btnboardcancel">Back</button><button class="btn" id="btnboardapply" disabled>Install</button></div></div>';
+    document.body.appendChild(modal);
+    $('btnboardcancel').onclick=cancelBoardJob;$('btnboardapply').onclick=applyBoardJob;
+  }
+}
+function installReason(kind){
+  return S.fixtures.length>=S.maxFixtures&&S.fixtures.every(f=>f.kind===kind)?'All slots already hold this fixture':'';
+}
+function renderBoardStock(){
+  $('boardstockcount').textContent=S.fixtures.length+' / '+S.maxFixtures+' installed';
+  const box=$('boardstock');box.innerHTML='';
+  const offer=S.boardOffer;if(!offer)return;
+  const d=FIXTURES[offer.kind],reason=installReason(offer.kind),card=document.createElement('div');card.className='card fixture-stock'+(offer.sold?' sold':'');
+  card.innerHTML='<div class="fixture-mark">'+d.ico+'</div><div><div class="t">'+d.name+'</div><div class="d">'+d.desc+'</div></div><button class="buy">'+(offer.sold?'Installed':reason||'Fit $'+d.price)+'</button>';
+  const button=card.querySelector('button');button.disabled=offer.sold||!!reason||S.money-d.price<moneyFloor();
+  button.onclick=()=>beginBoardJob({kind:'install',fixture:offer.kind,source:'shop',price:d.price});box.appendChild(card);
+}
+function beginBoardJob(options){
+  if(boardJob||deckJob)return;
+  if(options.kind==='install'&&installReason(options.fixture))return;
+  boardJob={...options,price:options.price||0,from:null,to:null,card:null};
+  renderBoardJob();show('ov-boardwork');
+}
+function cancelBoardJob(){boardJob=null;hide('ov-boardwork');if(S.pendingJobPack)renderJobPack();}
+function renderBoardJob(){
+  const job=boardJob,grid=$('boardplan');grid.innerHTML='';grid.classList.toggle('draw-plan',job.kind==='stack');
+  const d=job.fixture?FIXTURES[job.fixture]:null;
+  $('boardworktitle').textContent=d?'Fit '+d.name:job.kind==='move'?'Move a fixture':'Stack';
+  $('boardworkdesc').textContent=d?d.desc:job.kind==='move'?'Choose a fixture, then a new cell. Moving it does not refill its charge or uses.':'Send one of these draws to the bottom. The other draws keep their order.';
+  if(job.kind==='stack'){
+    S.pile.slice(0,3).forEach((card,i)=>{
+      const button=document.createElement('button');button.className='plan-draw'+(job.card===card?' selected':'');
+      button.disabled=i===S.pile.length-1;button.setAttribute('aria-pressed',String(job.card===card));button.appendChild(miniTile(card));
+      const label=document.createElement('span');label.textContent='Draw '+(i+1);button.appendChild(label);
+      button.onclick=()=>{job.card=card;renderBoardJob();};grid.appendChild(button);
+    });
+    $('boardworkpreview').textContent=job.card?'Send '+(job.card.enh?ENH[job.card.enh].name+' ':'')+job.card.v+' to the bottom.':'Choose one of the upcoming draws.';
+  }else{
+    grid.style.setProperty('--plan-n',S.N);
+    for(let r=0;r<S.N;r++)for(let c=0;c<S.N;c++){
+      const existing=fixtureAt(r,c),selected=job.to?.r===r&&job.to?.c===c,source=job.from===existing&&!!existing;
+      const button=document.createElement('button');button.className='plan-cell'+(selected?' selected':'')+(source?' source':'');
+      button.disabled=job.kind==='install'?(existing?.kind===job.fixture||(!existing&&S.fixtures.length>=S.maxFixtures)):!existing&&!job.from;
+      button.setAttribute('aria-label','Row '+(r+1)+', column '+(c+1)+(existing?', '+FIXTURES[existing.kind].name:', empty fixture slot'));
+      button.setAttribute('aria-pressed',String(selected||source));
+      button.innerHTML='<small>'+(r+1)+','+(c+1)+'</small><b>'+(existing?FIXTURES[existing.kind].ico:'＋')+'</b><span>'+(existing?FIXTURES[existing.kind].name:'')+'</span>';
+      button.onclick=()=>{
+        if(job.kind==='move'&&existing){job.from=existing;job.to=null;}else job.to={r,c};
+        renderBoardJob();
+      };grid.appendChild(button);
+    }
+    const old=job.to?fixtureAt(job.to.r,job.to.c):null;
+    $('boardworkpreview').textContent=job.to?(job.kind==='move'?'Move '+FIXTURES[job.from.kind].name:'Install '+d.name)+' at '+(job.to.r+1)+','+(job.to.c+1)+'.'+(old?' Replaces '+FIXTURES[old.kind].name+' with no refund.':''):
+      job.kind==='move'?(job.from?'Choose an empty fixture slot.':'Choose the fixture to move.'):'Choose a cell. '+S.fixtures.length+' / '+S.maxFixtures+' installed.';
+  }
+  $('btnboardapply').textContent=(job.kind==='stack'?'Send to bottom':job.kind==='move'?'Move fixture':'Install')+(job.price?' · $'+job.price:'');
+  $('btnboardapply').disabled=!(job.kind==='stack'?job.card:job.to)||S.money-job.price<moneyFloor();
+}
+function applyBoardJob(){
+  const job=boardJob;if(!job||$('btnboardapply').disabled)return;
+  if(S.money-job.price<moneyFloor())return;
+  if(job.source==='shop'&&(!S.boardOffer||S.boardOffer.sold||S.boardOffer.kind!==job.fixture))return;
+  if(job.source==='pack'&&(!S.pendingJobPack||S.pendingJobPack.taken.includes(job.packId)))return;
+  if(job.kind==='install'){
+    if(!job.to)return;
+    const old=fixtureAt(job.to.r,job.to.c);if(!old&&S.fixtures.length>=S.maxFixtures)return;
+    if(old)S.fixtures.splice(S.fixtures.indexOf(old),1);
+    S.fixtures.push({kind:job.fixture,...job.to,uses:0,charge:0,dir:null,firedAt:-1});
+    activeCharms().forEach(c=>{if(c.onInstall)c.onInstall(c);});
+    log('Installed <b>'+FIXTURES[job.fixture].name+'</b> at '+(job.to.r+1)+','+(job.to.c+1)+'.');
+  }else if(job.kind==='move'){
+    if(!job.to||!S.fixtures.includes(job.from)||fixtureAt(job.to.r,job.to.c))return;
+    job.from.r=job.to.r;job.from.c=job.to.c;
+  }else if(job.kind==='stack'){
+    const i=S.pile.indexOf(job.card);if(i<0||i>=3)return;
+    S.pile.push(S.pile.splice(i,1)[0]);
+  }
+  S.money-=job.price;
+  if(job.kind!=='stack')(T.boardEdits||=[]).push({kind:job.kind,fixture:job.fixture||job.from.kind,to:job.to,ante:S.ante,blind:S.blind});
+  boardJob=null;undoSnap=null;hide('ov-boardwork');
+  if(job.source==='item'){finishCon(job.idx);return;}
+  if(job.source==='shop'){S.boardOffer.sold=true;curShop().bought.push('fixture:'+job.fixture);}
+  if(job.source==='pack'){
+    S.pendingJobPack.taken.push(job.packId);S.pendingJobPack.remaining--;
+    if(!S.pendingJobPack.remaining){S.pendingJobPack=null;hide('ov-pack');}
+    curShop().bought.push('workshop-pack:'+job.packId);
+    S.consUsed++;S.charms.forEach(c=>{if(c.onUseCon)c.onUseCon(c);});
+  }
+  audio.effect('upgrade');render();renderShop();if(S.pendingJobPack)renderJobPack();saveT();
 }
 function curShop(){ return T.shops[T.shops.length-1]; }
 function pickVoucher(){
@@ -743,7 +954,7 @@ function renderVoucher(){
 }
 const PACK_TYPES={
   tile:{name:'Tile',mark:'Ⅱ',price:6,desc:'Add tiles to your deck. Higher values must be made on the board first.'},
-  workshop:{name:'Blueprint',mark:'✦',price:6,desc:'Deck work, supplies, cash and upgrades for the run.'},
+  workshop:{name:'Blueprint',mark:'✦',price:6,desc:'Deck work, board fixtures, supplies and upgrades for the run.'},
   backroom:{name:'Oddity',mark:'◇',price:8,desc:'Experimental deck edits with stronger effects and tradeoffs.'},
 };
 const PACK_SIZES={
@@ -835,9 +1046,9 @@ function renderShop(){
     }
     $("shopgrid").appendChild(el);
   });
-  renderPacks(); renderVoucher();
+  renderPacks(); renderVoucher();renderBoardStock();
   renderItemRack($('shopcons'),'shop');
-  $('shopconsnote').textContent=(S.nextMoves?'+'+S.nextMoves+' moves next round · ':'')+(S.polish?S.polish+' polished moves · ':'')+S.cons.length+' / '+S.maxCons;
+  $('shopconsnote').textContent=(S.nextMoves?'+'+S.nextMoves+' moves next round · ':'')+S.cons.length+' / '+S.maxCons;
   const rc=S.freeReroll||S.rerollTickets>0?0:S.rerollCost;
   $("btnreroll").textContent=rc?"Reroll $"+rc:"Reroll (free)"+(S.rerollTickets>0?" · "+S.rerollTickets+" tickets":""); $("btnreroll").disabled=S.money-rc<moneyFloor();
   $("shopcharms").innerHTML="";
@@ -875,7 +1086,7 @@ function growBoard(){
 }
 
 // ---------- consumables ----------
-function instantCon(d){return d.id==='clock'||d.id==='polish';}
+function instantCon(d){return ['clock','polish','grease','hotwire'].includes(d.id);}
 function deckDef(d){
   const kinds={promote:'promote',twin:'clone',burn:'remove',temper:'random',recast_item:'replace',split_item:'split',eraser:'remove',halve:'halve',double:'promote'};
   const kind=d.stamp?'stamp':kinds[d.id];
@@ -884,6 +1095,11 @@ function deckDef(d){
 function boardTargets(d){return d.deck||d.stamp?(d.id==='recast_item'?2:1):d.targets;}
 function conReason(d,place){
   if(d.id==='polish'&&S.polish>=3)return 'Polish is already ready';
+  if(d.id==='grease'&&S.grease>=4)return 'Grease is already ready';
+  if(d.id==='hotwire'&&!S.fixtures.length)return 'Install a fixture first';
+  if(d.id==='hotwire'&&S.hotwire>=3)return 'Hot Wire is already ready';
+  if(d.id==='wrench')return S.fixtures.length?'':'Install a fixture first';
+  if(d.id==='stack')return place==='pack'?'Use before opening a pack':S.pile.length>1?'':'Needs at least two upcoming draws';
   if(place==='shop')return instantCon(d)?'':deckDef(d)?'Use on the board or in a Blueprint / Oddity pack':'Use on the board';
   if(place==='pack'){
     if(!S.pendingJobPack)return 'Open a Blueprint or Oddity pack first';
@@ -909,9 +1125,10 @@ function renderItemRack(container,place){
   });
 }
 function useCon(i,place='board'){
-  if(locked||deckJob) return;
+  if(locked||deckJob||boardJob) return;
   const d=S.cons[i];if(!d)return;
   const reason=conReason(d,place);if(reason){hint(reason,true);return;}
+  if(d.id==='wrench'||d.id==='stack'){if(target)cancelTarget();beginBoardJob({kind:d.id==='wrench'?'move':'stack',idx:i,source:'item'});return;}
   if(place==='pack'&&deckDef(d)){openDeckPick(i,d);return;}
   if(target){ cancelTarget(); return; }
   const targets=boardTargets(d);
@@ -929,6 +1146,8 @@ function useCon(i,place='board'){
     else {S.moves+=6;curRound().movesAllowed+=6;}
   }
   else if(d.id==="polish"){ S.polish=3; }
+  else if(d.id==='grease'){S.grease=4;}
+  else if(d.id==='hotwire'){S.hotwire=3;}
   if(!ok) return;
   finishCon(i);
 }
@@ -971,6 +1190,7 @@ function finishCon(i){
 // ---------- permanent deck work ----------
 // Pack contents are used immediately; a Deluxe pack has two separate picks.
 const WORKSHOP=[
+ ...Object.entries(FIXTURES).map(([fixture,d])=>({id:'plan_'+fixture,kind:'fixture',fixture,name:d.name+' Plans',ico:d.ico,count:0,desc:'Install a '+d.name+' on one board cell for the run. '+d.desc})),
  {id:'trim',kind:'remove',name:'Trim',ico:'−',price:3,count:2,desc:'Remove up to 2 tiles. Keep at least 12 in your deck.'},
  {id:'recast',kind:'replace',name:'Recast',ico:'⇒',price:5,count:2,desc:'Choose a template, then turn another tile into an exact copy.'},
  {id:'duplicate',kind:'clone',name:'Duplicate',ico:'Ⅱ',price:5,count:1,desc:'Add a copy of a tile, including its enhancement. Needs a free deck slot.'},
@@ -1001,6 +1221,7 @@ function recordDeckEdit(kind,before,after){
   activeCharms().forEach(c=>{if(c.onDeckEdit)c.onDeckEdit(c,entry);});
 }
 function editReason(d,hand=null){
+  if(d.kind==='fixture')return installReason(d.fixture);
   if(d.kind==='dividend'&&S.money<2)return 'Needs cash on hand';
   if(d.kind==='parcel'&&S.maxCons-S.cons.length<2)return 'Needs two empty item slots';
   if(d.kind==='pocket'&&S.maxCons>=5)return 'All five item slots unlocked';
@@ -1033,7 +1254,7 @@ function renderJobPack(){
   const g=$('packgrid');g.innerHTML='';g.classList.toggle('expanded',options.length>3);
   options.forEach(d=>{
     const used=taken.includes(d.id),reason=editReason(d,packHand()),el=document.createElement('button');el.className='opt job-opt'+(used?' taken':'');
-    el.innerHTML='<div class="job-opt-mark">'+d.ico+'</div><div class="nm">'+d.name+'</div><div class="ds">'+d.desc+'</div><small class="pack-tag">'+(used?'Used':reason||(kind==='workshop'?'WORKSHOP':'BACKROOM'))+'</small>';
+    el.innerHTML='<div class="job-opt-mark">'+d.ico+'</div><div class="nm">'+d.name+'</div><div class="ds">'+d.desc+'</div><small class="pack-tag">'+(used?'Used':reason||(d.kind==='fixture'?'BOARD FIXTURE':kind==='workshop'?'WORKSHOP':'BACKROOM'))+'</small>';
     el.disabled=used||!!reason;
     el.onclick=()=>{if(S.pendingJobPack!==pending||taken.includes(d.id))return;beginDeckJob(d,{source,price:0,hand:packHand()});};
     g.appendChild(el);
@@ -1050,6 +1271,7 @@ function cancelDeckJob(){
   if(S.pendingJobPack)renderJobPack();
 }
 function beginDeckJob(def,options={}){
+  if(def.kind==='fixture'){beginBoardJob({kind:'install',fixture:def.fixture,source:'pack',packId:def.id});return;}
   const hand=options.hand||packHand();
   const reason=editReason(def,hand);if(reason){hint(reason,true);return;}
   deckJob={def,source:options.source||'item',idx:options.idx,price:options.price||0,picks:[],enh:def.stamp||null,hand};
@@ -1160,7 +1382,7 @@ function cancelTarget(){ target=null; $("board").classList.remove("targeting"); 
 
 // ---------- end states ----------
 function statLines(){
-  return [["Reached","Ante "+S.ante+" · "+BLINDS[S.blind].name],["Rounds won",S.roundsWon],["Best single move",fmt(S.bestMove)],["Highest tile",fmt(maxTile())],["Charms",S.charms.map(c=>c.name).join(", ")||"none"],["Deck",deckSummary()]];
+  return [["Reached","Ante "+S.ante+" · "+BLINDS[S.blind].name],["Rounds won",S.roundsWon],["Best single move",fmt(S.bestMove)],["Highest tile",fmt(maxTile())],["Charms",S.charms.map(c=>c.name).join(", ")||"none"],["Fixtures",fixtureSummary()],["Deck",deckSummary()]];
 }
 function gameOver(reason){
   finishReveal();
@@ -1209,7 +1431,7 @@ function tlogText(){
       out.push(" A"+r.ante+anteAbbr(r.blind)+(r.boss?"("+r.boss+")":"")+"  "+(r.result||"?").padEnd(4)+" "+fmt(r.score||tot).padStart(9)+"/"+fmt(r.target).padEnd(9)
         +" mv "+String(used).padStart(2)+"/"+r.movesAllowed+"  scoring "+scoring.length+"  avg "+fmt(avg).padStart(7)+"  best "+fmt(best).padStart(8)
         +"  max "+(r.maxTile||"?")+"  tiles "+(r.tilesEnd!=null?r.tilesEnd:"?")+"  $"+r.moneyStart+(r.moneyEnd!=null?"→"+r.moneyEnd:"")
-        +"  charms ["+r.charms.join(",")+"]"+(r.vouchers&&r.vouchers.length?" v["+r.vouchers.join(",")+"]":"")+(r.deck?" deck{"+r.deck+"}(avg "+r.deckAvg+")":"")+(r.filed&&r.filed.length?" filed["+r.filed.join(",")+"]":"")+(r.bones?" BONES":""));
+        +"  charms ["+r.charms.join(",")+"]"+(r.vouchers&&r.vouchers.length?" v["+r.vouchers.join(",")+"]":"")+(r.deck?" deck{"+r.deck+"}(avg "+r.deckAvg+")":"")+(r.fixtures?.length?" fixtures["+r.fixtures.map(f=>f.kind+'@'+(f.r+1)+','+(f.c+1)).join(' ')+"]":"")+(r.filed&&r.filed.length?" filed["+r.filed.join(",")+"]":"")+(r.bones?" BONES":""));
       out.push("    board start "+r.boardStart.join(" ")+(r.boardEnd?"  | end "+r.boardEnd.join(" "):""));
       out.push("    moves "+r.moves.map(m=>m.undo?"undo":m.con?"c:"+m.con:m.total?fmt(m.total).replace(/,/g,"")+"("+m.chips+"x"+m.mult+")"+(m.shatter?"!":""):"-").join(" "));
     });
@@ -1240,6 +1462,7 @@ function syncTiles(){
   });
   els.forEach((e,id)=>{ if(!live.has(id)&&!e.classList.contains("shatter")){ e.remove(); els.delete(id); } });
   renderDeck();
+  renderFixtureBoard();
 }
 function miniTile(c){ const d=document.createElement("div"); d.className="mini"; d.dataset.v=c.v; d.dataset.enh=c.enh||""; d.title=c.v+(c.enh?" · "+ENH[c.enh].name+": "+ENH[c.enh].desc:""); d.setAttribute("aria-label",d.title); d.textContent=c.v; if(c.enh){ const b=document.createElement("span"); b.className="eb"; b.textContent=ENH[c.enh].ico; d.appendChild(b); } return d; }
 function renderDeck(){
@@ -1281,14 +1504,14 @@ function render(){
       slot.innerHTML=i===0?"<span>Win a round.<br>Visit the shop.</span>":"+"; ct.appendChild(slot);
     }
   }
-  $("rubblelbl").textContent=S.rubbleIn+" move"+(S.rubbleIn===1?"":"s");
-  document.querySelector(".rubble-clock").classList.toggle("urgent",S.rubbleIn<=1);
+  $("rubblelbl").textContent=S.grease?'Paused · '+S.grease+' moves':S.rubbleIn+" move"+(S.rubbleIn===1?"":"s");
+  document.querySelector(".rubble-clock").classList.toggle("urgent",S.rubbleIn<=1&&!S.grease);
   $("boardstatus").textContent=target?"CHOOSE A TILE":S.banked?"TARGET CLEARED":S.boss?"BOSS ROUND":S.moves<=6?"MAKE THEM COUNT":"MAKE YOUR MOVE";
   document.querySelector(".board-label span:last-child").textContent=S.N+" × "+S.N;
   $("bankhint").textContent=S.movesMade<2?"Merge matching tiles to score.":S.banked?"Bank now, or keep playing for extra cash.":"Score "+fmt(Math.max(0,S.target-S.score))+" more to clear the round.";
   $("roundtrack").innerHTML=[0,1,2].map(i=>(i?"<i></i>":"")+"<span class='"+(i===S.blind?"active ":i<S.blind?"done ":"")+(i===2?"boss":"")+"'>"+(i===2?"B":"0"+(i+1))+"</span>").join("");
   $("roundtrack").setAttribute("aria-label",BLINDS[S.blind].name+", round "+(S.blind+1)+" of this ante");
-  renderCons(); renderDeck();
+  renderCons(); renderDeck();renderFixtureBoard();
 }
 function descOf(c){
   let d=c.desc;
@@ -1312,6 +1535,7 @@ function renderCons(){
     el.onclick=()=>useCon(i); t.appendChild(el);
   });
   if(S.polish>0){ const p=document.createElement("div"); p.className="empty"; p.style.borderColor="var(--purple)"; p.style.color="var(--purple)"; p.textContent="Polish: ×2 mult for "+S.polish+" more scoring moves"; t.appendChild(p); }
+  if(S.grease||S.hotwire){const p=document.createElement('div');p.className='empty';p.textContent=[S.grease?'Grease: '+S.grease+' moves left':'',S.hotwire?'Hot Wire: '+S.hotwire+' payouts left':''].filter(Boolean).join(' · ');t.appendChild(p);}
 }
 function calcNone(){ $("calc").innerHTML="<div class='idle'>No merge. Chain reset."+(has("patience")?" Rain Check stored +10 chips.":"")+(has("green")?" Green Light lost 1 mult.":"")+"</div>"; }
 function calcIdle(){ $("calc").innerHTML="<div class='idle'>Make a merge to score.</div>"; }
@@ -1418,7 +1642,7 @@ document.addEventListener('keydown',e=>{
   }
   if(e.key==='Escape'){
     e.preventDefault();
-    if(top){if(top==='ov-deckedit')cancelDeckJob();else if(top==='ov-pack')$('btnpackskip').click();else if(dismissable.has(top))hide(top);}
+    if(top){if(top==='ov-deckedit')cancelDeckJob();else if(top==='ov-boardwork')cancelBoardJob();else if(top==='ov-pack')$('btnpackskip').click();else if(dismissable.has(top))hide(top);}
     else if(target) cancelTarget();
     else if(S&&S.phase==='round') show('ov-pause');
     return;

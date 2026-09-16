@@ -12,7 +12,21 @@ Between rounds, buy charms, items, packs and permits. Each shop has exactly two 
 
 Blueprint and Oddity packs deal a random hand of 8 deck tiles. All jobs and held tile tools use that hand; canceling a selection or making a second Deluxe pick never redraws it. Removed tiles leave the hand, and newly created tiles go into the deck without replacing the missing choices. Held tools do not spend a pack pick. Changes inside a pack are permanent deck edits; using a tile tool during a round changes only the visible board. Archive still files a board tile into the deck.
 
-The shop has a held-item rack and a **Buy & use** option for Clock and Polish, even with full item slots. Clock used in the shop saves 6 extra moves for the next round; Polish waits for the next scoring moves. Tile tools must be used on the board or on the hand inside an open Blueprint or Oddity pack.
+The shop has a held-item rack and a **Buy & use** option for Clock, Polish, Grease and Hot Wire, even with full item slots. Clock used in the shop saves 6 extra moves for the next round; the other boosts wait for their stated triggers. Wrench moves an installed fixture without restoring its charge, and Stack sends one of the next three draws to the bottom of the pile. Tile tools must be used on the board or on the hand inside an open Blueprint or Oddity pack.
+
+**Board fixtures** stay on their chosen cells between rounds. Start with three slots; the Extension Lead permit unlocks a fourth. Each shop stocks one fixture separately from its two packs, and Blueprint packs can contain fixture plans. A new installation can replace an old one without a refund. Shop rerolls do not change fixture stock.
+
+| Fixture | Cost | Merge on its cell to… |
+|---|---:|---|
+| Press | $6 | Gain 20 chips. |
+| Flywheel | $8 | Collect stored chips: 10 per intervening move, up to 60. |
+| Toll Booth | $8 | Collect $1, twice per round. |
+| Copy Desk | $10 | Spawn a plain copy of a result up to 32, once per round; needs space. |
+| Inkwell | $9 | Give a plain result a random finish, once per round. |
+| Trapdoor | $10 | Gain ×1.6 mult and remove a result of 16 or more, twice per round. |
+| Switchboard | $7 | Gain +4 mult when the incoming direction differs from its previous hit. |
+
+Fixture charges and direction memory reset each round. Their effects resolve after tile finishes and before charms. Foreman rewards fixture activations; Live Circuit rewards hitting two at once; Field Notes grows when fixtures are installed. Compass, Clean Cut and Surveyor support alternating directions, plain tiles and merges spread across rows and columns. See [the board-workshop notes](reference/board-workshop.md) for tuning and interaction details.
 
 Higher values can rarely appear in tile packs after you have made that exact value on the board during the current run. Larger numbers stay rarer. Six mixed-finish reactions reward setting up particular pairs; the rules sheet describes each one. Each pairing triggers at most once per move.
 

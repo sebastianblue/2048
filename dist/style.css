@@ -75,6 +75,37 @@
 .packgrid.expanded{grid-template-columns:repeat(3,minmax(0,1fr))}
 .packgrid .opt.taken{opacity:.3;filter:grayscale(.6)}
 .pack-modal{position:relative}
+/* Fixtures are bolted into the board; tile finishes still travel with tiles. */
+.cells i[data-fixture]{display:grid;place-items:center;font:700 28px var(--display);font-style:normal;color:#aabd8a;border:2px dashed #94a97c;background:#334733;box-shadow:inset 0 0 0 4px #283b2d}
+.tile .socket-mark{position:absolute;right:4px;bottom:3px;min-width:20px;padding:2px 4px;background:#253c30;color:#e6d28a;border:1px solid #aeb077;border-radius:2px;font:700 12px/1 var(--display);box-shadow:0 1px 0 #0004}
+.tile .socket-mark[data-spent=true]{color:#b1b6a1;background:#4b5144;border-color:#8d9581}
+.fixture-hud{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px}
+.fixture-hud[hidden]{display:none}
+.fixture-label{flex:1;min-width:100px;text-align:left;border:1px solid #7b8d694d;border-left:3px solid #aaa66d;background:#27392e;padding:7px 8px;border-radius:2px;color:#d8d7b7}
+.fixture-label b{font:700 15px var(--display);display:block}
+.fixture-label small{display:block;font-size:9px;color:#a9b49b;margin-top:2px}
+.fixture-label:hover{background:#3a4a36}
+.fixture-label[data-fired=true]{border-left-color:#edc15c;background:#3b4830}
+.tile .socket-mark[data-fired=true]{color:#fff2be;border-color:#edc15c;background:#526335}
+.fixture-stock{display:grid;grid-template-columns:55px 1fr auto;align-items:center;gap:14px}
+.fixture-stock .buy{margin:0;white-space:nowrap;font-size:19px;padding:8px 13px}
+.fixture-mark{width:55px;height:55px;display:grid;place-items:center;background:#344d39;color:#e4d898;border:3px double #a9b187;font:700 29px var(--display);border-radius:3px}
+.board-stock-section h3{margin-bottom:12px}
+.board-workshop{max-width:540px}
+.board-plan{--plan-n:4;display:grid;grid-template-columns:repeat(var(--plan-n),minmax(0,1fr));gap:7px;padding:12px;margin:20px 0;background:#344536;border:2px solid #77816a;border-radius:5px}
+.plan-cell{aspect-ratio:1;display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;border:1px solid #a8b08a;background:#d7d8b9;border-bottom:3px solid #909779;color:#3c5137;border-radius:3px;padding:6px}
+.plan-cell small{align-self:flex-start;font-size:9px;line-height:1;opacity:.65}
+.plan-cell b{font:700 30px/1.1 var(--display);margin:auto}
+.plan-cell>span{font:600 11px/1 var(--display)}
+.plan-cell:disabled{opacity:.3}
+.plan-cell.selected,.plan-cell.source{background:#efd598;border-color:#f4bd66;box-shadow:inset 0 0 0 2px #b66b37}
+.plan-cell.source{background:#b6d0af;box-shadow:inset 0 0 0 2px #4c7844}
+.plan-cell:hover:not(:disabled){background:#f0e4b7}
+.board-plan.draw-plan{grid-template-columns:repeat(3,minmax(0,1fr));padding:18px}
+.plan-draw{display:flex;flex-direction:column;align-items:center;gap:10px;padding:16px 8px;color:#dbdfbe;border:1px solid #7d9370;border-radius:3px;font-size:11px}
+.plan-draw.selected{background:#627550;outline:2px solid #e3cf89}
+.plan-draw:disabled{opacity:.3}
+@media(max-width:500px){.fixture-stock{grid-template-columns:45px 1fr;gap:10px}.fixture-mark{width:45px;height:45px}.fixture-stock .buy{grid-column:1/-1}.fixture-label{min-width:40%;padding:6px}.plan-cell b{font-size:25px}.plan-cell>span{font-size:9px}.board-plan{gap:5px;padding:8px}.plan-cell{padding:4px}}
 .item-rack{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
 .item-rack .card.use{height:100%;align-items:flex-start}
 .card.use:disabled{opacity:.55;cursor:default}

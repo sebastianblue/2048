@@ -264,7 +264,7 @@ test('Escape returns an unfinished edit to its pack, then discards the pack with
 
 test('workshop utility choices charge only the pack price and deliver their stated run upgrades', t => {
   const {game, $, shop} = createGame(t);
-  for (const def of game.WORKSHOP.filter(item => item.count === 0)) {
+  for (const def of game.WORKSHOP.filter(item => item.count === 0 && item.kind !== 'fixture')) {
     game.newRun('utility-' + def.kind);
     shop();
     game.openJobPack(game.state.packs[0]);
