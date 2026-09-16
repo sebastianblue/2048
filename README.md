@@ -10,6 +10,10 @@ Use arrow keys, WASD, swipe, or the direction buttons. A valid slide costs one m
 
 Between rounds, buy charms, items, packs and permits. Each shop has exactly two random pack offers in one Packs section. Tile and Blueprint packs share the common pool; Oddity packs are rare. Offers can repeat a type, and neither common type is guaranteed. Shop rerolls do not refresh packs. Blueprint packs contain deck edits, supplies, money and upgrades for the run. Kick, Plus, Prism, Iron, Brass and Odds each have their own blueprint, which applies only that named finish to a chosen tile. Rare Oddity packs contain experimental deck work with tradeoffs. **Opening any pack spends its price permanently.** You can skip its contents, but there are no refunds or replacement offers. Standard packs offer 3 choices and 1 pick; Large packs offer 5 choices and 1 pick; Deluxe packs offer 5 choices and 2 picks. Oddity packs offer up to 4 unique effects. Larger packs cost more. The Print Shop permit adds one extra tile-pack choice and takes $1 off the listed price.
 
+Blueprint and Oddity packs deal a random hand of 8 deck tiles. All jobs and held tile tools use that hand; canceling a selection or making a second Deluxe pick never redraws it. Removed tiles leave the hand, and newly created tiles go into the deck without replacing the missing choices. Held tools do not spend a pack pick. Changes inside a pack are permanent deck edits; using a tile tool during a round changes only the visible board. Archive still files a board tile into the deck.
+
+The shop has a held-item rack and a **Buy & use** option for Clock and Polish, even with full item slots. Clock used in the shop saves 6 extra moves for the next round; Polish waits for the next scoring moves. Tile tools must be used on the board or on the hand inside an open Blueprint or Oddity pack.
+
 Higher values can rarely appear in tile packs after you have made that exact value on the board during the current run. Larger numbers stay rarer. Six mixed-finish reactions reward setting up particular pairs; the rules sheet describes each one. Each pairing triggers at most once per move.
 
 The board resets each round; your deck, charms and purchased upgrades remain for the run. Music keeps its place between screens. Sound settings have separate music/effects sliders, a mute button and manual track selection. Reduced-motion settings are respected.
@@ -38,7 +42,7 @@ git push origin main
 npm run deploy
 ```
 
-The publisher copies the committed `dist` tree into a new, ordinary commit on `gh-pages`. It preserves publishing history and refuses uncommitted game files. GitHub Pages publishes that branch automatically.
+The publisher copies the committed `dist` tree into a new, ordinary commit on `gh-pages`. It preserves publishing history and refuses uncommitted game files. GitHub Pages publishes that branch automatically. Keep the asset version parameters in `index.html` aligned with each release. The game also upgrades the older cached shop layout before rendering it.
 
 ## Run history and checks
 

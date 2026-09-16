@@ -125,7 +125,7 @@ test('deck edits cannot unlock a value that has never been merged on the board',
   shop();
   for (const def of [{id: 'promote', kind: 'promote', name: 'Promote', desc: '', count: 1}, game.EXPERIMENTS.find(item => item.id === 'smelt')]) {
     game.state.deck[0].v = 4;
-    game.beginDeckJob(def, {source: 'workshop', price: 0});
+    game.beginDeckJob(def, {source: 'workshop', price: 0, hand: game.state.deck.slice(0, 8)});
     selectJobTiles();
     $('btneditapply').click();
   }
