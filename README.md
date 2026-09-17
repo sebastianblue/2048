@@ -10,9 +10,9 @@ Use arrow keys, WASD, swipe, or the direction buttons. A valid slide costs one m
 
 Between rounds, buy mods, items, packs and firmware. Each shop has exactly two random pack offers in one Packs section. Tile and Blueprint packs share the common pool; Blacksite packs are rare. Offers can repeat a type, and neither common type is guaranteed. Shop rerolls do not refresh packs. Blueprint packs contain deck edits, supplies, money and upgrades for the run. Kick, Plus, Prism, Iron, Brass and Odds each have their own blueprint, which applies only that named finish to a chosen tile. Rare Blacksite packs contain experimental deck work with tradeoffs. **Opening any pack spends its price permanently.** You can skip its contents, but there are no refunds or replacement offers. Standard packs offer 3 choices and 1 pick; Large packs offer 5 choices and 1 pick; Deluxe packs offer 5 choices and 2 picks. Larger packs cost more. The Print Shop firmware adds one extra tile-pack choice and takes $1 off the listed price. Bulk License adds one choice to Blueprint and Blacksite packs; it never adds a pick.
 
-Blueprint and Blacksite packs deal a random hand of 8 deck tiles. All jobs and held tile tools use that hand; canceling a selection or making a second Deluxe pick never redraws it. Removed tiles leave the hand, and newly created tiles go into the deck without replacing the missing choices. Held tools do not spend a pack pick. Changes inside a pack are permanent deck edits; using a tile tool during a round changes only the visible board. Archive still files a board tile into the deck.
+Blueprint and Blacksite packs deal a random hand of 8 deck tiles. All tile jobs and held tile tools use that hand; canceling a selection or making a second Deluxe pick never redraws it. Removed tiles leave the hand, and newly created tiles go into the deck without replacing the missing choices. Held tools do not spend a pack pick. Changes inside a pack are permanent deck edits. During rounds, Blueprints and tools marked **Permanent** target linked draws marked **↗** and update the exact source card in the deck, upcoming pile and matching linked draws. Merges break the link; temporary copies and temporarily altered draws cannot be used to rewrite deck cards. Ordinary tactical tools stay temporary. Archive still files any eligible board tile into the deck.
 
-The shop has a held-item rack and a **Buy & use** option for immediate items: Clock, Polish, Grease, Hot Wire, Read Head, Service Pass, Credit Chip and Scrap Cache. Most work even with full item slots; Scrap Cache needs room for its two tools. Clock used in the shop saves 6 extra moves for the next round (8 with Spare Battery); other boosts wait for their stated triggers. Wrench moves an installed fixture without restoring its charge, and Stack sends one of the next three draws to the bottom of the pile. Deck-editing tools work on the board or the hand inside an open Blueprint or Blacksite pack. Positional tools such as Line Driver and Skip Trace work only on the board.
+The shop has a held-item rack and a **Buy & use** option for immediate items: Clock, Polish, Grease, Hot Wire, Read Head, Service Pass, Credit Chip and Scrap Cache. Most work even with full item slots; Scrap Cache needs room for its two tools. Clock used in the shop saves 6 extra moves for the next round (8 with Spare Battery); other boosts wait for their stated triggers. Wrench moves an installed fixture without restoring its charge, and Stack sends one of the next three draws to the bottom of the pile. Permanent deck tools work on marked linked draws or the hand inside an open Blueprint or Blacksite pack. Positional tools such as Line Driver and Skip Trace work only on the board.
 
 **Board fixtures** stay on their chosen cells between rounds. Start with three slots; the Extension Lead firmware unlocks a fourth. Each shop stocks one fixture separately from its two packs, and Blueprint packs can contain fixture plans. A new installation can replace an old one without a refund. Shop rerolls do not change fixture stock.
 
@@ -40,6 +40,17 @@ This release adds **50 cards: ten mods, ten consumables, ten Blueprint effects, 
 
 All additions have source review and syntax checks only. No automated tests or browser playtests were run for this release, at the user's request; tuning remains unplaytested.
 
+## Loadout & runs / v2.1.0
+
+- **Boss forecast:** see the current ante's boss from its first round and in the shop. After beating it, the shop previews the next ante's boss. Each boss is chosen once from a separate seeded schedule.
+- **Permanent board edits:** named finish Blueprints, Mould, Wedge, Promote, Twin, Burn and Temper now change their linked deck cards when used during a round. Eligible draws show ↗ and highlight when selecting; merged tiles never become eligible again.
+- **Collection:** all mods, items, Blueprints, Blacksite cards, firmware, fixtures and finishes are visible from the title screen, pause menu and footer. Search names/effects and filter mod rarity. There are no hidden card definitions.
+- **Difficulty:** Street → Wired → Hardline → Lockdown → Kill Screen. Beat Ante 8 on a level to unlock the next. Higher levels raise targets, reduce moves, speed rubble or reduce starting cash; all penalties are listed before starting. Existing full-run wins unlock Wired.
+- **Skins:** After Hours and Paper Arcade are free. Amber Terminal, Ice Station and Scarlet Circuit unlock at 1, 3 and 5 full-run wins. Skins are purely cosmetic and can change in Settings mid-run. Unlocks stay in this browser; QA preferences are separate.
+- **Mod work:** six new Blueprint cards and two Blacksite cards tune, trade, salvage, transfer tuning or overdrive owned mods. Extra cash and permanent move costs are shown before applying; canceling spends no pick. See [details and caps](reference/loadout-and-runs.md).
+
+This release received source and syntax review only, with no automated tests, browser playtests or audio playback, as requested. Difficulty tuning awaits playtest evidence.
+
 ## Local development
 
 Requires a recent Node.js release (Node 22 or newer recommended).
@@ -51,7 +62,7 @@ npm start
 
 Open http://127.0.0.1:4178/. Use `?qa=1` to keep test-run history and sound preferences separate from your normal browser history.
 
-The game is authored directly in `dist/`; there is no build step and no production dependency. `index.html` loads `game.js` (rules/UI), `audio.js` (music/sound) and `juice.js` (impact/reveal animations). `style.css` provides layout; `cyberpunk.css`, local fonts and the original `assets/after-hours.svg` city illustration provide the After Hours presentation. Legacy `engine.js`/`app.js` are retained for the earlier version and are not loaded by the current page.
+The game is authored directly in `dist/`; there is no build step and no production dependency. `index.html` loads `game.js` (rules/UI), `audio.js` (music/sound) and `juice.js` (impact/reveal animations). `style.css` provides layout; `cyberpunk.css`, local fonts and the original `assets/after-hours.svg` city illustration provide the After Hours presentation. `progression.js`/`.css` handle cosmetic and difficulty unlock menus; `collection.js`/`.css` render the card catalogue from the game definitions; `run-upgrades.css` styles boss forecasts, linked draws and mod work. Legacy `engine.js`/`app.js` are retained for the earlier version and are not loaded by the current page.
 
 ## Publishing
 
