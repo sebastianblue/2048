@@ -1,0 +1,35 @@
+.boss-forecast { margin:12px 0; border:1px solid var(--rim); border-left:3px solid var(--pink); padding:10px 12px; background:var(--paper); color:var(--ink); }
+.boss-forecast summary { display:flex; flex-direction:column; gap:5px; cursor:pointer; list-style:none; }
+.boss-forecast summary::after { content:'Show rule +'; font:10px var(--mono); color:var(--grey); }
+.boss-forecast[open] summary::after { content:'Hide rule −'; }
+.boss-forecast summary>span { font:10px var(--mono); text-transform:uppercase; letter-spacing:.04em; color:var(--grey); }
+.boss-forecast strong { font:700 22px/1 var(--display); color:var(--pink); }
+.boss-forecast p { margin:10px 0 8px; font-size:12px; line-height:1.45; color:var(--ink); }
+.boss-forecast small { font-size:10px; color:var(--grey); }
+.shop-forecast summary { display:grid; grid-template-columns:1fr auto; align-items:center; }
+.shop-forecast summary::after { grid-column:2; grid-row:1; }
+.shop-forecast strong { grid-column:1; }
+.deck-link-legend { font-size:10px; line-height:1.5; color:var(--grey); margin:10px 0 3px; }
+.tile .deck-link { position:absolute; bottom:3px; left:4px; padding:1px 4px; border:1px solid #173941; border-radius:2px; color:#dcfff3; background:#164f4f; font:700 11px/1 var(--mono); pointer-events:none; }
+.tile.permanent-pick { outline:3px solid #78e8d5; outline-offset:-4px; box-shadow:inset 0 0 0 5px #164f4f; cursor:pointer; }
+.tile.permanent-pick .deck-link { color:#09251e; background:#a9f6d6; border-color:#f0fff8; }
+.tile.not-eligible { opacity:.28; cursor:not-allowed; outline:none; }
+.modwork-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; margin:20px 0; }
+.modwork-card { align-items:flex-start; flex-direction:column; gap:8px; text-align:left; padding:16px 12px; min-height:180px; }
+.modwork-card .ico { flex:none; }
+.modwork-card small { color:var(--grey); margin-top:auto; }
+.modwork-card.selected { outline:2px solid var(--pink); outline-offset:2px; }
+.modwork-card:disabled { opacity:.35; cursor:default; }
+.modwork-card:not(:disabled):hover { border-color:var(--blue); }
+@media(max-width:700px) {
+  .boss-forecast { grid-column:1/-1; margin:0; padding:9px 11px; }
+  .boss-forecast summary { display:grid; grid-template-columns:1fr auto; align-items:center; gap:3px 10px; }
+  .boss-forecast strong { font-size:20px; grid-column:1; }
+  .boss-forecast summary::after { grid-column:2; grid-row:1/3; }
+  .shop-forecast { margin:12px 0; }
+  .modwork-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+  .modwork-card { padding:12px 10px; }
+  .deck-link-legend { font-size:9px; }
+  .tile .deck-link { font-size:9px; left:3px; bottom:3px; padding:1px 3px; }
+}
+@media(max-width:370px) { .modwork-grid { grid-template-columns:1fr; } }
