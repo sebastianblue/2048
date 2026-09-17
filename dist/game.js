@@ -1,6 +1,6 @@
 (function(){
 "use strict";
-const VERSION="1.8.0";
+const VERSION="2.0.0";
 const STORAGE = new URLSearchParams(location.search).has("qa") ? "ante2048.qa." : "ante2048.";
 const escapeHTML = s => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]);
 const $ = id => document.getElementById(id);
@@ -144,7 +144,7 @@ const CHARMS=[
   score:(c,me)=>{ if(S.moves<=5) c.add(me,{xmult:2}); }},
  {id:"mono",ico:"■",name:"Heavy Stock",rar:"u",price:6,desc:"<em>×3 mult</em> if every tile on the board is 16 or more.",
   score:(c,me)=>{ const t=allTiles(); if(t.length&&t.every(x=>x.v>=16)) c.add(me,{xmult:3}); }},
- {id:"baseball",ico:"×U",name:"Union Card",rar:"u",price:7,desc:"<em>×1.5 mult</em> for every other uncommon charm you own.",
+ {id:"baseball",ico:"×U",name:"Union Card",rar:"u",price:7,desc:"<em>×1.5 mult</em> for every other uncommon mod you own.",
   score:(c,me)=>{ const k=S.charms.filter(x=>x!==me&&x.rar==="u").length; if(k) c.add(me,{xmult:Math.min(4,Math.round(Math.pow(1.5,k)*100)/100)}); }},
  {id:"fortune",ico:"✦",name:"Toolbox",rar:"u",price:6,desc:"<em>+1 mult</em> per consumable used this run. <span class='st'>Now +{used}</span>",
   score:(c,me)=>{ if(S.consUsed) c.add(me,{mult:S.consUsed}); }},
@@ -188,21 +188,53 @@ const CHARMS=[
   st:{x:1}, score:(c,me)=>{ const big=c.merges.filter(m=>m.v>=256); big.forEach(m=>{ me.st.x=r1(Math.min(3,me.st.x+0.1)); if(m.tile) m.tile.v/=2; }); if(me.st.x>1) c.add(me,{xmult:me.st.x}); if(big.length) c.dirty=true; }},
  {id:"constellation",ico:"✧",name:"Calibration",rar:"r",price:8,desc:"Gains <em>×0.15 mult</em> every time you use a consumable. <span class='st'>Now ×{x}</span>",
   st:{x:1}, score:(c,me)=>{ if(me.st.x>1) c.add(me,{xmult:me.st.x}); }, onUseCon:me=>{ me.st.x=Math.min(3,Math.round((me.st.x+0.15)*100)/100); }},
- {id:"campfire",ico:"×½",name:"Trade Up",rar:"r",price:8,desc:"Gains <em>×0.5 mult</em> for every charm you sell. Resets after you beat a boss. <span class='st'>Now ×{x}</span>",
+ {id:"campfire",ico:"×½",name:"Trade Up",rar:"r",price:8,desc:"Gains <em>×0.5 mult</em> for every mod you sell. Resets after you beat a boss. <span class='st'>Now ×{x}</span>",
   st:{x:1}, score:(c,me)=>{ if(me.st.x>1) c.add(me,{xmult:me.st.x}); }, onSell:me=>{ me.st.x=r1(Math.min(4,me.st.x+0.5)); }, roundEnd:(lines,me)=>{ if(S.blind===2) me.st.x=1; }},
  {id:"space",ico:"✶",name:"Cosmic Dust",rar:"r",price:8,desc:"1 in 4 each scoring move to gain <em>+1 mult</em>, up to +25. <span class='st'>Now +{m}</span>",
   st:{m:0}, score:(c,me)=>{ if(S.rng()<0.25&&me.st.m<25){ me.st.m++; c.note(me,"grew"); } if(me.st.m) c.add(me,{mult:me.st.m}); }},
  {id:"cavendish",ico:"×3",name:"Long-Life Battery",rar:"r",price:8,desc:"<em>×3 mult</em>. 1 in 1000 chance to run flat at the end of each round.",
   score:(c,me)=>c.add(me,{xmult:3}), roundEnd:(lines,me)=>{ if(S.rng()<0.001){ destroyCharm(me,"ran flat"); lines.push(["Long-Life Battery","ran flat"]); } }},
- {id:"dagger",ico:"†",name:"Scrap Dealer",rar:"r",price:8,desc:"At the start of each round, <em>destroys the charm to its right</em> and gains mult equal to its price. <span class='st'>Now +{m}</span>",
+ {id:"dagger",ico:"†",name:"Scrap Dealer",rar:"r",price:8,desc:"At the start of each round, <em>destroys the mod to its right</em> and gains mult equal to its price. <span class='st'>Now +{m}</span>",
   st:{m:0}, score:(c,me)=>{ if(me.st.m) c.add(me,{mult:me.st.m}); }, roundStart:me=>{ const i=S.charms.indexOf(me); const v=S.charms[i+1]; if(v&&!v.nosell){ me.st.m+=v.price; destroyCharm(v,"sacrificed"); log("Scrap Dealer took <b>"+v.name+"</b> for +"+v.price+" mult."); } }},
- {id:"blueprint",ico:"⇒",name:"Relay",rar:"r",price:9,desc:"Copies the <em>scoring ability</em> of the charm to its right.",
+ {id:"blueprint",ico:"⇒",name:"Relay",rar:"r",price:9,desc:"Copies the <em>scoring ability</em> of the mod to its right.",
   score:(c,me)=>{ const i=S.charms.indexOf(me); const v=S.charms[i+1]; if(v&&v.score&&v.id!=="blueprint"){ c.as=me; v.score(c,v); c.as=null; } }},
  {id:"shortcut",ico:"↗",name:"Step Ladder",rar:"r",price:9,desc:"A tile can also merge into a tile <em>twice its value</em> (4 + 8 → 16)."},
  {id:"sixth",ico:"5²",name:"Annex",rar:"r",price:9,desc:"The board becomes <em>5×5</em>. Can't be sold.", nosell:true},
  {id:"alchemist",ico:"++",name:"Catalyst",rar:"r",price:8,desc:"When two <em>enhanced</em> tiles merge, the new tile fires both enhancements <em>again</em>."},
+ // ----- night-market hardware -----
+ {id:'boot_rom',ico:'ON',name:'Boot ROM',rar:'c',price:4,desc:'Your first scoring move each round gets <em>+100 chips</em>.',st:{ready:true},
+  roundStart:me=>{me.st.ready=true;},score:(ctx,me)=>{if(!me.st.ready)return;ctx.add(me,{chips:100});if(!ctx.as)me.st.ready=false;}},
+ {id:'cassette_loop',ico:'↺Ⅱ',name:'Cassette Loop',rar:'u',price:6,desc:'Repeat the previous scoring move’s exact merge values for <em>×1.8 mult</em>. Order does not matter.',st:{pattern:''},
+  roundStart:me=>{me.st.pattern='';},score:(ctx,me)=>{const pattern=ctx.merges.map(m=>m.v).sort((a,b)=>a-b).join(',');if(pattern===me.st.pattern)ctx.add(me,{xmult:1.8});if(!ctx.as)me.st.pattern=pattern;}},
+ {id:'cross_talk',ico:'><',name:'Cross Talk',rar:'c',price:5,desc:'<em>+6 mult</em> for each merge of two different finishes. Up to +12 per move.',
+  score:(ctx,me)=>{const n=ctx.merges.filter(m=>new Set(m.enhs).size>=2).length;if(n)ctx.add(me,{mult:Math.min(12,n*6)});}},
+ {id:'vacuum_tube',ico:'[○]',name:'Vacuum Tube',rar:'c',price:5,desc:'<em>+80 chips</em> while at least <em>8 cells</em> are empty.',
+  score:(ctx,me)=>{if(ctx.empty>=8)ctx.add(me,{chips:80});}},
+ {id:'null_modem',ico:'Ø',name:'Null Modem',rar:'r',price:8,desc:'<em>×2.2 mult</em> while exactly <em>one enhanced tile</em> is on the board.',
+  score:(ctx,me)=>{if(allTiles().filter(t=>!t.rock&&t.enh).length===1)ctx.add(me,{xmult:2.2});}},
+ {id:'minimal_rom',ico:'14',name:'Minimal ROM',rar:'u',price:6,desc:'<em>×1.8 mult</em> while your deck has <em>14 tiles or fewer</em>.',
+  score:(ctx,me)=>{if(S.deck.length<=14)ctx.add(me,{xmult:1.8});}},
+ {id:'parity_check',ico:'01',name:'Parity Check',rar:'c',price:5,desc:'Make a <em>4, 16, 64…</em> and an <em>8, 32, 128…</em> in the same move for <em>+60 chips</em>.',
+  score:(ctx,me)=>{if(ctx.merges.some(m=>oddExp(m.v))&&ctx.merges.some(m=>!oddExp(m.v)))ctx.add(me,{chips:60});}},
+ {id:'meter_reader',ico:'$▤',name:'Meter Reader',rar:'u',price:7,desc:'At round end, earn <em>$2</em> for each different fixture type activated. Up to <em>$6</em>.',st:{types:[]},
+  roundStart:me=>{me.st.types=[];},score:(ctx,me)=>{if(!ctx.as)me.st.types=[...new Set([...me.st.types,...(ctx.fixtureHits||[]).map(f=>f.kind)])];},
+  roundEnd:(lines,me)=>{const cash=Math.min(6,me.st.types.length*2);if(cash){S.money+=cash;lines.push([me.name,'+$'+cash]);}}},
+ {id:'pirate_radio',ico:'FM',name:'Pirate Radio',rar:'u',price:6,desc:'Each scoring activation tunes to <em>+60 chips</em>, <em>+8 mult</em> or <em>×1.6 mult</em>. Equal odds.',
+  score:(ctx,me)=>{const channel=Math.floor(S.rng()*3);ctx.add(me,channel===0?{chips:60}:channel===1?{mult:8}:{xmult:1.6});}},
+ {id:'end_of_tape',ico:'►|',name:'End of Tape',rar:'u',price:5,desc:'<em>+12 mult</em> while your draw pile has <em>3 tiles or fewer</em> left.',
+  score:(ctx,me)=>{if(S.pile.length<=3)ctx.add(me,{mult:12});}},
 ];
 const CONS=[
+ {id:'read_head',ico:'⇆',name:'Read Head',price:2,desc:'Reverse the order of your next 3 draws. Your deck stays the same.',targets:0},
+ {id:'service_pass',ico:'≡',name:'Service Pass',price:4,desc:'Get 2 free shop rerolls. Carry at most 4 tickets.',targets:0},
+ {id:'credit_chip',ico:'$5',name:'Credit Chip',price:3,desc:'Cash out $5. Redeem at most 3 Credit Chips per run.',targets:0},
+ {id:'scrap_cache',ico:'▣',name:'Scrap Cache',price:4,desc:'Get 2 different basic board tools. Needs one extra empty item slot.',targets:0},
+ {id:'patch_cable',ico:'⌁',name:'Patch Cable',price:3,desc:'Move a finish from one board tile to a plain tile. The source becomes plain.',targets:2},
+ {id:'echo_chip',ico:'»',name:'Echo Chip',price:5,desc:'Copy one tile’s finish to up to 2 adjacent plain tiles. Board only.',targets:1},
+ {id:'skip_trace',ico:'⌜↗',name:'Skip Trace',price:3,desc:'Send one tile to the nearest empty corner. It does not merge.',targets:1},
+ {id:'line_driver',ico:'→│',name:'Line Driver',price:3,desc:'Shift one row right by one cell, wrapping at the edge. Frozen tiles and walls block it.',targets:1},
+ {id:'plasma_cutter',ico:'✕+',name:'Plasma Cutter',price:4,desc:'Remove one tile and any loose rubble touching it. Walls stay put.',targets:1},
+ {id:'heat_sink',ico:'⇈',name:'Heat Sink',price:3,desc:'Strip one tile’s finish and double its value, up to 64. Enhanced tiles only.',targets:1},
  {id:'grease',ico:'≈',name:'Grease',price:3,desc:'Pause the rubble clock for your next 4 moves. Unused moves carry over.',targets:0},
  {id:'hotwire',ico:'⚡',name:'Hot Wire',price:3,desc:'Your next 3 moves that activate a fixture get +20 chips.',targets:0},
  {id:'wrench',ico:'⌁',name:'Wrench',price:3,desc:'Move one fixture to another cell. Keeps its charge and uses left.',targets:0},
@@ -216,7 +248,7 @@ const CONS=[
  {id:"shuffle",ico:"↻",name:"Shuffle",price:3,desc:"Scatter every tile to a random cell.",targets:0},
  {id:"purge",ico:"∅",name:"Purge",price:4,desc:"Remove every 2 and 4 on the board.",targets:0},
  {id:"undo",ico:"↶",name:"Undo",price:4,desc:"Take back your last move.",targets:0},
- {id:"clock",ico:"+6",name:"Clock",price:3,desc:"+6 moves. In the shop, save them for the next round.",targets:0},
+ {id:"clock",ico:"◷",name:"Clock",price:3,desc:"+6 moves. In the shop, save them for the next round.",targets:0},
  {id:"polish",ico:"×2",name:"Polish",price:6,desc:"Your next 3 scoring moves get ×2 mult.",targets:0},
  {id:"st_bonus",ico:"+30",name:"Kick Blueprint",price:3,desc:"Enhance one tile: +30 chips when it merges.",targets:1,deck:true,stamp:"bonus"},
  {id:"st_mult",ico:"+4",name:"Plus Blueprint",price:4,desc:"Enhance one tile: +4 mult when it merges.",targets:1,deck:true,stamp:"mult"},
@@ -232,15 +264,25 @@ const CONS=[
  {id:"temper",ico:"✦",name:"Temper",price:5,desc:"Give one tile a random enhancement.",deck:true},
 ];
 const VOUCHERS=[
- {id:'extension',ico:'▦+',name:'Extension Lead',price:10,desc:'Fit a fourth board fixture. Every fixture still needs its own cell.',max:1,apply:()=>{S.maxFixtures=4;}},
+ {id:'extension',ico:'▦+',name:'Extension Lead',price:10,desc:'Fit a fourth board fixture. Every fixture still needs its own cell.',max:1,eligible:()=>S.maxFixtures<4,apply:()=>{S.maxFixtures=4;}},
  {id:"overclock",ico:"+4",name:"Overclock",price:8,desc:"+4 moves every round. Stacks up to three times.",max:3,apply:()=>{S.bonusMoves+=4;}},
  {id:"purse",ico:"$+",name:"Bigger Purse",price:8,desc:"Interest cap rises by $2.",max:2,apply:()=>{S.interestCap+=2;}},
- {id:"slot",ico:"Ⅵ",name:"Sixth Slot",price:12,desc:"One more charm slot.",max:1,apply:()=>{S.maxCharms++;}},
- {id:"pockets",ico:"+1",name:"Deep Pockets",price:8,desc:"One more consumable slot.",max:1,apply:()=>{S.maxCons++;}},
+ {id:"slot",ico:"Ⅵ",name:"Sixth Slot",price:12,desc:"Unlock a sixth mod slot. Six slots maximum.",max:1,eligible:()=>S.maxCharms<6,apply:()=>{S.maxCharms=Math.min(6,S.maxCharms+1);}},
+ {id:"pockets",ico:"+1",name:"Deep Pockets",price:8,desc:"One more consumable slot. Five slots maximum.",max:1,eligible:()=>S.maxCons<5,apply:()=>{S.maxCons=Math.min(5,S.maxCons+1);}},
  {id:"coupon",ico:"−$2",name:"Coupon Book",price:6,desc:"Rerolls cost $2 less.",max:1,apply:()=>{S.rerollDisc+=2;}},
  {id:"headstart",ico:"×2",name:"Head Start",price:10,desc:"Both of your opening tiles start doubled each round.",max:1,apply:()=>{}},
  {id:"printer",ico:"Ⅳ",name:"Print Shop",price:8,desc:"Tile packs offer one extra card and cost $1 less.",max:1,apply:()=>{S.packSize=4;S.packDisc=1;}},
  {id:"occult",ico:"+1",name:"Supply Line",price:9,desc:"One extra consumable offered in every shop.",max:1,apply:()=>{}},
+ {id:'wide_bus',ico:'Ⅴ',name:'Wide Bus',price:7,desc:'See your next 5 draws instead of 3.',max:1,apply:()=>{S.previewDraws=5;}},
+ {id:'spare_battery',ico:'+2',name:'Spare Battery',price:7,desc:'Clocks give 8 moves instead of 6. Works on Clocks you already hold.',max:1,apply:()=>{S.clockBonus=2;}},
+ {id:'thermal_sleeve',ico:'▧',name:'Thermal Sleeve',price:9,desc:'Rubble takes one extra move to fall. Also works against The Drought.',max:1,apply:()=>{S.rubbleDelay=1;}},
+ {id:'copper_traces',ico:'+5',name:'Copper Traces',price:10,desc:'Every fixture activation adds 5 chips. Priming a Switchboard does not count.',max:1,apply:()=>{S.fixtureChipBonus=5;}},
+ {id:'field_service',ico:'+1',name:'Field Service',price:12,desc:'Toll Booth, Copy Desk, Inkwell and Trapdoor each get one extra use per round.',max:1,apply:()=>{S.fixtureExtraUse=1;}},
+ {id:'bulk_license',ico:'▤+',name:'Bulk License',price:9,desc:'Blueprint and Blacksite packs offer one extra choice. The number of picks stays the same.',max:1,apply:()=>{S.jobPackBonus=1;}},
+ {id:'price_scanner',ico:'−$1',name:'Price Scanner',price:7,desc:'Shop consumables cost $1 less, to a minimum of $1. Includes Buy & use.',max:1,apply:()=>{S.conDiscount=1;}},
+ {id:'signal_amp',ico:'+40',name:'Signal Amp',price:8,desc:'Add 40 chips to your first scoring move each round.',max:1,apply:()=>{S.openingChipBonus=40;}},
+ {id:'sorting_buffer',ico:'Ⅱ→',name:'Sorting Buffer',price:12,desc:'Each reshuffle starts with a pair of equal values, if your deck has one. Finishes can differ.',max:1,apply:()=>{S.sortDraws=true;}},
+ {id:'fuse_link',ico:'◇─',name:'Fuse Link',price:10,desc:'Save the first Prism tile that would shatter each round. Protects that tile for the whole move.',max:1,apply:()=>{S.prismFuse=true;}},
 ];
 const BOSSES=[
  {id:"freeze",name:"The Freeze",desc:"One tile is frozen in place. It won't move or merge."},
@@ -249,7 +291,7 @@ const BOSSES=[
  {id:"ceiling",name:"The Ceiling",desc:"Merges that create your current highest tile value score no chips."},
  {id:"hourglass",name:"The Hourglass",desc:"Only 16 moves this round (before bonuses)."},
  {id:"mirror",name:"The Mirror",desc:"Left is right. Up is down."},
- {id:"blackout",name:"The Blackout",desc:"Your first two charms are switched off."},
+ {id:"blackout",name:"The Blackout",desc:"Your first two mods are switched off."},
  {id:"weight",name:"The Weight",desc:"Every new tile spawns as an 8."},
  {id:"plain",name:"The Plain",desc:"Tile enhancements do nothing this round."},
  {id:"drought",name:"The Drought",desc:"Rubble falls twice as often."},
@@ -263,7 +305,17 @@ let queuedDirection=null,boardJob=null;
 let S=null, els=new Map(), locked=false, tileId=0, target=null, undoSnap=null, revealTimer=[], T=null, pendingReveal=null;
 
 function newDeck(){ const d=[]; for(let i=0;i<16;i++) d.push({v:2,enh:null}); for(let i=0;i<4;i++) d.push({v:4,enh:null}); return d; }
-function reshuffle(){ S.pile=S.deck.map(c=>({...c})); for(let i=S.pile.length-1;i>0;i--){ const j=Math.floor(S.rng()*(i+1)); [S.pile[i],S.pile[j]]=[S.pile[j],S.pile[i]]; } }
+function reshuffle(){
+  S.pile=S.deck.map(c=>({...c}));
+  for(let i=S.pile.length-1;i>0;i--){const j=Math.floor(S.rng()*(i+1));[S.pile[i],S.pile[j]]=[S.pile[j],S.pile[i]];}
+  if(S.sortDraws){
+    const first=S.pile.findIndex((card,i)=>S.pile.some((other,j)=>j>i&&other.v===card.v));
+    if(first>=0){
+      const a=S.pile.splice(first,1)[0],second=S.pile.findIndex(card=>card.v===a.v),b=S.pile.splice(second,1)[0];
+      S.pile.unshift(a,b);
+    }
+  }
+}
 function markMadeValue(v){ if(v>4) S.madeValues[String(v)]=(S.madeValues[String(v)]||0)+1; }
 function unlockedPackValues(){
   const made=Object.keys(S.madeValues||{}).map(Number).filter(v=>Number.isFinite(v)&&v>4);
@@ -325,6 +377,7 @@ function retireTile(t){
 }
 
 function newRun(seedStr){
+  if(target)cancelTarget();
   finishReveal(); queuedDirection=null; locked=false; audio.setScene("round");
   const seed=seedStr.slice(0,48)||randSeed();
   S={ seed, rng:mulberry(hashStr(seed)), ante:1, blind:0, N:4, grid:null, score:0, target:0, moves:0, moveCap:0, money:4,
@@ -363,11 +416,12 @@ function spawnRock(fixed){
   const t={id:++tileId,v:0,rock:true,fixed:!!fixed,r,c}; S.grid[r][c]=t; return t;
 }
 function rubbleEvery(){
-  if(S.boss&&S.boss.id==="drought") return 3;
-  if(has("roadworks")) return 9;
+  const delay=S.rubbleDelay||0;
+  if(S.boss&&S.boss.id==="drought") return 3+delay;
+  if(has("roadworks")) return 9+delay;
   let e = S.ante<=2?6:S.ante<=5?5:4;
   if(S.movesMade>=Math.floor(S.moveCap/2)) e=Math.max(3,e-2);
-  return e;
+  return e+delay;
 }
 function spawn(){
   const e=emptyCells(); if(!e.length) return null;
@@ -393,6 +447,7 @@ function deckSummary(){ const m={}; S.deck.forEach(c=>{ const k=(c.enh?c.enh+" "
 function startRound(){
   audio.setScene(S.blind===2?"boss":"round");
   S.phase="round"; S.score=0; S.frozen=null; S.ghostUsed=false; S.mom={dir:null,count:0}; undoSnap=null;
+  S.openingBonusUsed=false;S.prismFuseUsed=false;
   S.fixtures.forEach(f=>{f.uses=0;f.charge=0;f.dir=null;f.firedAt=-1;});
   S.boss = S.blind===2 ? pickBoss() : null;
   S.target=targetFor(S.ante,S.blind);
@@ -508,8 +563,9 @@ function score(merges,maxBefore){
   ctx.merges.forEach(m=>{ if(ceiling&&m.v===mx) ceil.push(m.v); else base+=m.v; });
   ctx.chips=base; ctx.steps.push({name:"merged "+ctx.merges.map(m=>m.v).join("+"),chips:base,mult:0,xmult:0});
   if(ceil.length) ctx.steps.push({name:"The Ceiling",txt:"0 chips for "+ceil.join(", ")});
+  if(S.openingChipBonus&&!S.openingBonusUsed){S.openingBonusUsed=true;ctx.chips+=S.openingChipBonus;ctx.steps.push({name:'Signal Amp',chips:S.openingChipBonus});}
   // tile enhancements
-  const plain=S.boss&&S.boss.id==="plain"; const shatterList=[]; let glassFired=0;
+  const plain=S.boss&&S.boss.id==="plain"; const shatterList=[],fuseSaved=new Set(); let glassFired=0;
   const reactions=[],reactionIds=new Set();
   if(!plain)ctx.merges.forEach(m=>{
     const d=reactionFor(m.enhs);
@@ -523,7 +579,13 @@ function score(merges,maxBefore){
         const add=(d)=>{ if(d.chips) ctx.chips+=d.chips; if(d.mult) ctx.mult+=d.mult; if(d.xmult) ctx.xmult*=d.xmult; ctx.steps.push({name:ENH[e].name+" tile",tid:m.tile.id,chips:d.chips||0,mult:d.mult||0,xmult:d.xmult||0}); };
         if(e==="bonus") add({chips:30});
         else if(e==="mult") add({mult:4});
-        else if(e==="glass"){ if(glassFired<2){ glassFired++; add({xmult:2}); } if(!tempered.has(m.tile.id)&&!has("glazier")&&S.rng()<0.25) shatterList.push(m.tile); }
+        else if(e==="glass"){
+          if(glassFired<2){glassFired++;add({xmult:2});}
+          if(!tempered.has(m.tile.id)&&!fuseSaved.has(m.tile.id)&&!has("glazier")&&S.rng()<0.25){
+            if(S.prismFuse&&!S.prismFuseUsed){S.prismFuseUsed=true;fuseSaved.add(m.tile.id);ctx.steps.push({name:'Fuse Link',tid:m.tile.id,txt:'Prism saved'});}
+            else if(!shatterList.includes(m.tile))shatterList.push(m.tile);
+          }
+        }
         else if(e==="gold"){ S.money+=2; ctx.steps.push({name:"Brass tile",tid:m.tile.id,txt:"+$2"}); }
         else if(e==="lucky"){ if(S.rng()<0.25) add({mult:8}); else ctx.steps.push({name:"Odds tile",tid:m.tile.id,txt:"no luck"}); if(S.rng()<1/12){ S.money+=4; ctx.steps.push({name:"Odds tile",tid:m.tile.id,txt:"+$4"}); } }
       });
@@ -583,7 +645,8 @@ function scoreFixtures(ctx){
   ctx.fixtureHits=[];
   S.fixtures.forEach(f=>{
     const d=FIXTURES[f.kind],m=ctx.merges.find(m=>m.r===f.r&&m.c===f.c);
-    if(!m||(d.limit&&f.uses>=d.limit))return;
+    const limit=fixtureLimit(f);
+    if(!m||(limit&&f.uses>=limit))return;
     const step={name:d.name+' ['+(f.r+1)+','+(f.c+1)+']',tid:m.tile.id};
     if(f.kind==='press')step.chips=20;
     else if(f.kind==='flywheel'){
@@ -615,17 +678,28 @@ function scoreFixtures(ctx){
     if(step.mult)ctx.mult+=step.mult;
     if(step.xmult)ctx.xmult*=step.xmult;
     ctx.steps.push(step);
+    if(S.fixtureChipBonus){ctx.chips+=S.fixtureChipBonus;ctx.steps.push({name:'Copper Traces',tid:m.tile.id,chips:S.fixtureChipBonus});}
   });
   if(ctx.fixtureHits.length&&S.hotwire>0){S.hotwire--;ctx.chips+=20;ctx.steps.push({name:'Hot Wire',chips:20});}
   ctx.empty=emptyCells().length;
 }
 function fixtureAt(r,c){return S.fixtures.find(f=>f.r===r&&f.c===c);}
+function fixtureLimit(f){const limit=FIXTURES[f.kind].limit;return limit?limit+(S.fixtureExtraUse||0):0;}
+function fixtureDescription(kind){
+  const d=FIXTURES[kind];let desc=d.desc;
+  if(d.limit&&S.fixtureExtraUse){
+    const limit=d.limit+S.fixtureExtraUse;
+    desc=kind==='toll'?'The first '+limit+' merges here each round pay $1 each.':desc.replace(/^(Once|Twice) per round,/,limit+' times per round,');
+  }
+  if(S.fixtureChipBonus)desc+=' Each activation also gives '+S.fixtureChipBonus+' chips.';
+  return desc;
+}
 function fixtureStatus(f){
-  const d=FIXTURES[f.kind];
-  if(d.limit)return Math.max(0,d.limit-f.uses)+' / '+d.limit+' left';
+  const limit=fixtureLimit(f);
+  if(limit)return Math.max(0,limit-f.uses)+' / '+limit+' left';
   if(f.kind==='flywheel')return f.charge+' / 60 chips';
   if(f.kind==='switchboard')return f.dir?'last: '+f.dir:'unprimed';
-  return '+20 chips';
+  return '+'+(20+(S.fixtureChipBonus||0))+' chips';
 }
 function fixtureSummary(){return S.fixtures.map(f=>FIXTURES[f.kind].name+' ['+(f.r+1)+','+(f.c+1)+']').join(', ')||'none';}
 function renderFixtureBoard(){
@@ -639,14 +713,14 @@ function renderFixtureBoard(){
     e.setAttribute('aria-label',e.title+', row '+(t.r+1)+', column '+(t.c+1));
     const f=fixtureAt(t.r,t.c);if(!f)return;
     const d=FIXTURES[f.kind],tag=document.createElement('span');tag.className='socket-mark';tag.textContent=d.ico;
-    tag.dataset.spent=String(!!d.limit&&f.uses>=d.limit);tag.dataset.fired=String(S.phase==='round'&&f.firedAt===S.movesMade);tag.title=d.name+' · '+fixtureStatus(f);e.appendChild(tag);
+    tag.dataset.spent=String(!!fixtureLimit(f)&&f.uses>=fixtureLimit(f));tag.dataset.fired=String(S.phase==='round'&&f.firedAt===S.movesMade);tag.title=d.name+' · '+fixtureStatus(f);e.appendChild(tag);
     e.setAttribute('aria-label',e.title+'; on '+d.name+', '+fixtureStatus(f));
   });
   const hud=$('fixturehud');hud.innerHTML='';hud.hidden=!S.fixtures.length;
   S.fixtures.forEach(f=>{
-    const d=FIXTURES[f.kind],label=document.createElement('button');label.className='fixture-label';label.title=d.desc;label.dataset.fired=String(S.phase==='round'&&f.firedAt===S.movesMade);
+    const d=FIXTURES[f.kind],label=document.createElement('button');label.className='fixture-label';label.title=fixtureDescription(f.kind);label.dataset.fired=String(S.phase==='round'&&f.firedAt===S.movesMade);
     label.innerHTML='<b>'+d.ico+' '+d.name+'</b><small>'+(f.r+1)+','+(f.c+1)+' · '+fixtureStatus(f)+'</small>';
-    label.onclick=()=>{ $('inspectname').textContent=d.name;$('inspecticon').textContent=d.ico;$('inspectrarity').textContent='Board fixture · '+(f.r+1)+','+(f.c+1);$('inspectdesc').textContent=d.desc+' '+fixtureStatus(f)+'. Charges reset each round.';show('ov-inspect'); };
+    label.onclick=()=>{ $('inspectname').textContent=d.name;$('inspecticon').textContent=d.ico;$('inspectrarity').textContent='Board fixture · '+(f.r+1)+','+(f.c+1);$('inspectdesc').textContent=fixtureDescription(f.kind)+' '+fixtureStatus(f)+'. Charges reset each round.';show('ov-inspect'); };
     hud.appendChild(label);
   });
 }
@@ -713,12 +787,13 @@ function afterMove(result){
     gameOver(S.quota&&!S.quotaMet&&S.score>=S.target ? "You hit the score but never built a "+S.quota+"." : S.moves<=0 ? "Out of moves. You scored "+fmt(S.score)+" of "+fmt(S.target)+"." : "No legal moves. The board locked up at "+fmt(S.score)+" of "+fmt(S.target)+".");
   }
 }
-function snapshot(){ return {grid:S.grid.map(row=>row.map(t=>t?{...t}:null)),score:S.score,moves:S.moves,money:S.money,madeValues:{...S.madeValues},mom:{...S.mom},polish:S.polish,fixtures:S.fixtures.map(f=>({...f})),grease:S.grease,hotwire:S.hotwire,rubbleIn:S.rubbleIn,movesMade:S.movesMade,chain:S.chain,pile:S.pile.map(c=>({...c})),charmSt:S.charms.map(c=>JSON.stringify(c.st))}; }
+function snapshot(){ return {grid:S.grid.map(row=>row.map(t=>t?{...t}:null)),score:S.score,moves:S.moves,money:S.money,madeValues:{...S.madeValues},mom:{...S.mom},polish:S.polish,fixtures:S.fixtures.map(f=>({...f})),grease:S.grease,hotwire:S.hotwire,rubbleIn:S.rubbleIn,movesMade:S.movesMade,chain:S.chain,openingBonusUsed:S.openingBonusUsed,prismFuseUsed:S.prismFuseUsed,pile:S.pile.map(c=>({...c})),charmSt:S.charms.map(c=>JSON.stringify(c.st))}; }
 function restore(sn){
   S.grid=sn.grid.map(row=>row.map(t=>t?{...t}:null)); S.score=sn.score; S.moves=sn.moves; S.money=sn.money; S.madeValues={...sn.madeValues}; S.mom={...sn.mom}; S.polish=sn.polish; S.pile=sn.pile.map(c=>({...c}));
   S.charms.forEach((c,i)=>{ if(sn.charmSt[i]) c.st=JSON.parse(sn.charmSt[i]); });
   S.fixtures=sn.fixtures.map(f=>({...f}));S.grease=sn.grease;S.hotwire=sn.hotwire;
   S.rubbleIn=sn.rubbleIn;S.movesMade=sn.movesMade;S.chain=sn.chain;
+  S.openingBonusUsed=sn.openingBonusUsed;S.prismFuseUsed=sn.prismFuseUsed;
   curRound().moves.push({undo:true});
   syncTiles(); render(); calcIdle();
 }
@@ -733,6 +808,7 @@ function shuffleBoard(){
 // ---------- round end / shop ----------
 function overflowCash(){ return Math.min(10,Math.floor((S.score-S.target)/Math.max(1,S.target*0.4))); }
 function winRound(viaBones){
+  if(target)cancelTarget();
   finishReveal();
   S.phase="cash"; S.roundsWon++;
   const lines=[]; const b=BLINDS[S.blind];
@@ -770,7 +846,7 @@ function renderRetire(){
   $("btncash").textContent="Skip and cash out";
 }
 function banner(txt){ const b=document.createElement("div"); b.className="banner"; b.innerHTML="<span></span>"; b.firstChild.textContent=txt; $("board").appendChild(b); setTimeout(()=>b.remove(),1300); }
-function confetti(){ if(reduced) return; const cols=["#edc15c","#efe8d4","#d75838","#a9c288"]; for(let i=0;i<28;i++){ const c=document.createElement("div"); c.className="conf"; c.style.left=Math.random()*100+"vw"; c.style.top=(-20-Math.random()*60)+"px"; c.style.background=cols[i%cols.length]; c.style.animationDelay=(Math.random()*.4)+"s"; document.body.appendChild(c); setTimeout(()=>c.remove(),1800); } }
+function confetti(){ if(reduced) return; const cols=["#60d4df","#efba68","#f079a0","#ca9bf0"]; for(let i=0;i<28;i++){ const c=document.createElement("div"); c.className="conf"; c.style.left=Math.random()*100+"vw"; c.style.top=(-20-Math.random()*60)+"px"; c.style.background=cols[i%cols.length]; c.style.animationDelay=(Math.random()*.4)+"s"; document.body.appendChild(c); setTimeout(()=>c.remove(),1800); } }
 $("btncashnow").onclick=()=>{ if(S.phase==="round"&&S.banked){ S.phase="cash"; finishReveal(); winRound(); } };
 $("btncash").onclick=()=>{
   const rr=curRound(); if(S.retired.length){ rr.filed=S.retired.slice(); S.retired=[]; }
@@ -797,6 +873,7 @@ function rollShop(){
   S.shop=items;
 }
 function openShop(){
+  if(target)cancelTarget();
   ensureShopLayout();
   audio.setScene("shop");
   S.pendingJobPack=null; S.pendingTilePack=null;
@@ -816,6 +893,9 @@ function openShop(){
 // Older cached HTML used separate Deck and Special stock sections. Upgrade
 // that layout before rendering, so a mixed-version page can still open the shop.
 function ensureShopLayout(){
+  if(!$('after-hours-theme')){
+    const theme=document.createElement('link');theme.id='after-hours-theme';theme.rel='stylesheet';theme.href='./cyberpunk.css?v='+VERSION;document.head.appendChild(theme);
+  }
   const version=document.querySelector('.footer small');if(version)version.textContent=VERSION;
   if(!$('packstock')){
     const section=document.createElement('div');section.className='shopsec packs-section';
@@ -861,7 +941,7 @@ function renderBoardStock(){
   const box=$('boardstock');box.innerHTML='';
   const offer=S.boardOffer;if(!offer)return;
   const d=FIXTURES[offer.kind],reason=installReason(offer.kind),card=document.createElement('div');card.className='card fixture-stock'+(offer.sold?' sold':'');
-  card.innerHTML='<div class="fixture-mark">'+d.ico+'</div><div><div class="t">'+d.name+'</div><div class="d">'+d.desc+'</div></div><button class="buy">'+(offer.sold?'Installed':reason||'Fit $'+d.price)+'</button>';
+  card.innerHTML='<div class="fixture-mark">'+d.ico+'</div><div><div class="t">'+d.name+'</div><div class="d">'+fixtureDescription(offer.kind)+'</div></div><button class="buy">'+(offer.sold?'Installed':reason||'Fit $'+d.price)+'</button>';
   const button=card.querySelector('button');button.disabled=offer.sold||!!reason||S.money-d.price<moneyFloor();
   button.onclick=()=>beginBoardJob({kind:'install',fixture:offer.kind,source:'shop',price:d.price});box.appendChild(card);
 }
@@ -876,7 +956,7 @@ function renderBoardJob(){
   const job=boardJob,grid=$('boardplan');grid.innerHTML='';grid.classList.toggle('draw-plan',job.kind==='stack');
   const d=job.fixture?FIXTURES[job.fixture]:null;
   $('boardworktitle').textContent=d?'Fit '+d.name:job.kind==='move'?'Move a fixture':'Stack';
-  $('boardworkdesc').textContent=d?d.desc:job.kind==='move'?'Choose a fixture, then a new cell. Moving it does not refill its charge or uses.':'Send one of these draws to the bottom. The other draws keep their order.';
+  $('boardworkdesc').textContent=d?fixtureDescription(job.fixture):job.kind==='move'?'Choose a fixture, then a new cell. Moving it does not refill its charge or uses.':'Send one of these draws to the bottom. The other draws keep their order.';
   if(job.kind==='stack'){
     S.pile.slice(0,3).forEach((card,i)=>{
       const button=document.createElement('button');button.className='plan-draw'+(job.card===card?' selected':'');
@@ -940,22 +1020,22 @@ function applyBoardJob(){
 }
 function curShop(){ return T.shops[T.shops.length-1]; }
 function pickVoucher(){
-  const pool=VOUCHERS.filter(v=>S.vouchers.filter(x=>x===v.id).length<v.max);
+  const pool=VOUCHERS.filter(v=>S.vouchers.filter(x=>x===v.id).length<v.max&&(!v.eligible||v.eligible()));
   S.voucher = pool.length ? {def:pool[Math.floor(S.rng()*pool.length)],sold:false} : null;
 }
 function renderVoucher(){
   const box=$("voucherbox"); box.innerHTML="";
-  if(!S.voucher){ box.innerHTML="<div class='empty'>No vouchers left to buy.</div>"; return; }
-  const v=S.voucher, d=v.def, afford=S.money-d.price>=moneyFloor();
+  if(!S.voucher){ box.innerHTML="<div class='empty'>All firmware installed.</div>"; return; }
+  const v=S.voucher, d=v.def, afford=S.money-d.price>=moneyFloor(),eligible=!d.eligible||d.eligible();
   const el=document.createElement("div"); el.className="card voucher"+(v.sold?" sold":""); el.style.alignItems="center";
-  el.innerHTML="<div class='ico'>"+d.ico+"</div><div style='flex:1'><div class='t'>"+d.name+"</div><div class='d'>"+d.desc+"</div></div><button class='buy' style='margin:0;align-self:center;padding:6px 12px;flex:none' "+(v.sold||!afford?"disabled":"")+">"+(v.sold?"Bought":"Buy $"+d.price)+"</button>";
-  el.querySelector(".buy").onclick=()=>{ if(v.sold||S.money-d.price<moneyFloor()) return; S.money-=d.price; v.sold=true; S.vouchers.push(d.id); d.apply(); curShop().bought.push("v:"+d.id); audio.effect("buy"); log("Voucher: <b>"+d.name+"</b>."); renderShop(); };
+  el.innerHTML="<div class='ico'>"+d.ico+"</div><div style='flex:1'><div class='t'>"+d.name+"</div><div class='d'>"+d.desc+"</div></div><button class='buy' style='margin:0;align-self:center;padding:6px 12px;flex:none' "+(v.sold||!afford||!eligible?"disabled":"")+">"+(v.sold?"Installed":!eligible?"At limit":"Install $"+d.price)+"</button>";
+  el.querySelector(".buy").onclick=()=>{ if(v.sold||S.money-d.price<moneyFloor()||(d.eligible&&!d.eligible())) return; S.money-=d.price; v.sold=true; S.vouchers.push(d.id); d.apply(); curShop().bought.push("v:"+d.id); audio.effect("buy"); log("Installed <b>"+d.name+"</b>."); renderShop();saveT(); };
   box.appendChild(el);
 }
 const PACK_TYPES={
   tile:{name:'Tile',mark:'Ⅱ',price:6,desc:'Add tiles to your deck. Higher values must be made on the board first.'},
   workshop:{name:'Blueprint',mark:'✦',price:6,desc:'Deck work, board fixtures, supplies and upgrades for the run.'},
-  backroom:{name:'Oddity',mark:'◇',price:8,desc:'Experimental deck edits with stronger effects and tradeoffs.'},
+  backroom:{name:'Blacksite',mark:'◇',price:8,desc:'Experimental deck edits. Big changes, lasting costs.'},
 };
 const PACK_SIZES={
   standard:{name:'',cards:3,picks:1,extra:0},
@@ -975,7 +1055,7 @@ function packName(pack){return [PACK_SIZES[pack.size].name,PACK_TYPES[pack.kind]
 function packPrice(pack){return Math.max(1,PACK_TYPES[pack.kind].price+PACK_SIZES[pack.size].extra+(pack.kind==='backroom'&&pack.size==='deluxe'?1:0)-(pack.kind==='tile'?S.packDisc:0));}
 function packCardCount(pack){
   const count=PACK_SIZES[pack.size].cards;
-  return pack.kind==='tile'?count+Math.max(0,S.packSize-3):Math.min(count,(pack.kind==='workshop'?WORKSHOP:EXPERIMENTS).length);
+  return pack.kind==='tile'?count+Math.max(0,S.packSize-3):Math.min(count+(S.jobPackBonus||0),(pack.kind==='workshop'?WORKSHOP:EXPERIMENTS).length);
 }
 function canOpenPack(pack){return S.phase==='shop'&&S.packs.includes(pack)&&!pack.sold&&!S.pendingTilePack&&!S.pendingJobPack&&S.money-packPrice(pack)>=moneyFloor();}
 function renderPacks(){
@@ -1029,20 +1109,21 @@ $('btnpackskip').onclick=()=>{
   S.pendingTilePack=null;S.pendingJobPack=null;
   hide('ov-pack');renderShop();saveT();
 };
+function shopPrice(it){return Math.max(1,it.def.price-(it.kind==='con'?(S.conDiscount||0):0));}
 function renderShop(){
   $("shopwallet").textContent="$"+S.money;
   $("shopgrid").innerHTML="";
   S.shop.forEach((it,i)=>{
     const d=it.def, full = it.kind==="charm" ? S.charms.length>=S.maxCharms : S.cons.length>=S.maxCons;
-    const afford = S.money-d.price>=moneyFloor();
+    const price=shopPrice(it),afford=S.money-price>=moneyFloor();
     const el=document.createElement("div"); el.className="card"+(it.sold?" sold":"")+(it.kind==="con"?" con":"");
-    el.innerHTML="<div style='display:flex;gap:10px;align-items:flex-start;width:100%'><div class='ico'>"+d.ico+"</div><div><div class='t'>"+d.name+"</div><div class='d'>"+descOf(d)+"</div></div></div>"+
+    el.innerHTML="<div style='display:flex;gap:10px;align-items:flex-start;width:100%'><div class='ico'>"+d.ico+"</div><div><div class='t'>"+d.name+"</div><div class='d'>"+(it.kind==='con'?conDescription(d,'shop'):descOf(d))+"</div></div></div>"+
       (it.kind==="charm"?"<span class='rare "+d.rar+"'>"+({c:"common",u:"uncommon",r:"rare"})[d.rar]+"</span>":"<span class='rare' style='background:var(--blue2);color:var(--ink)'>"+(d.stamp?"blueprint":"consumable")+"</span>")+
-      "<button class='buy' "+(it.sold||!afford||full?"disabled":"")+">"+(it.sold?"Sold":full?"No room":"Buy $"+d.price)+"</button>";
+      "<button class='buy' "+(it.sold||!afford||full?"disabled":"")+">"+(it.sold?"Sold":full?"No room":"Buy $"+price)+"</button>";
     el.querySelector(".buy").onclick=()=>buy(i);
     if(it.kind==='con'&&instantCon(d)){
-      const use=document.createElement('button');use.className='buy use-now';use.textContent='Buy & use $'+d.price;
-      use.disabled=it.sold||!afford||!!conReason(d,'shop');use.onclick=()=>buyAndUse(i);el.appendChild(use);
+      const use=document.createElement('button');use.className='buy use-now';use.textContent='Buy & use $'+price;
+      const reason=conReason(d,'shop',false);use.disabled=it.sold||!afford||!!reason;use.title=reason;use.onclick=()=>buyAndUse(i);el.appendChild(use);
     }
     $("shopgrid").appendChild(el);
   });
@@ -1052,7 +1133,7 @@ function renderShop(){
   const rc=S.freeReroll||S.rerollTickets>0?0:S.rerollCost;
   $("btnreroll").textContent=rc?"Reroll $"+rc:"Reroll (free)"+(S.rerollTickets>0?" · "+S.rerollTickets+" tickets":""); $("btnreroll").disabled=S.money-rc<moneyFloor();
   $("shopcharms").innerHTML="";
-  if(!S.charms.length) $("shopcharms").innerHTML="<div class='empty' style='width:100%'>Buy a charm to start your build.</div>";
+  if(!S.charms.length) $("shopcharms").innerHTML="<div class='empty' style='width:100%'>Buy a mod to start your build.</div>";
   S.charms.forEach((c,i)=>{
     const el=charmCard(c,i); el.classList.remove("charm"); el.removeAttribute("role"); el.tabIndex=-1; el.onclick=null; el.onkeydown=null;
     const acts=document.createElement("div"); acts.className="acts";
@@ -1065,17 +1146,18 @@ function renderShop(){
   render();
 }
 function buy(i){
-  const it=S.shop[i], d=it.def; if(it.sold||S.money-d.price<moneyFloor()) return;
+  const it=S.shop[i],d=it.def,price=shopPrice(it);if(S.phase!=='shop'||it.sold||S.money-price<moneyFloor())return;
   if(it.kind==="charm"){ if(S.charms.length>=S.maxCharms) return; S.charms.push(makeCharm(d)); if(d.id==="sixth") growBoard(); }
   else { if(S.cons.length>=S.maxCons) return; S.cons.push({...d}); }
-  S.money-=d.price; it.sold=true; curShop().bought.push(d.id); audio.effect("buy"); log("Bought <b>"+d.name+"</b> for $"+d.price+".");
+  S.money-=price; it.sold=true; curShop().bought.push(d.id); audio.effect("buy"); log("Bought <b>"+d.name+"</b> for $"+price+".");
   const m=$("shopwallet"); m.classList.remove("bump"); void m.offsetWidth; m.classList.add("bump");
   renderShop();
 }
 function buyAndUse(i){
-  const it=S.shop[i],d=it.def;
-  if(S.phase!=='shop'||it.kind!=='con'||!instantCon(d)||it.sold||S.money-d.price<moneyFloor()||conReason(d,'shop'))return;
-  S.money-=d.price;it.sold=true;curShop().bought.push(d.id);
+  const it=S.shop[i],d=it.def,price=shopPrice(it);
+  if(locked||deckJob||boardJob||S.phase!=='shop'||it.kind!=='con'||!instantCon(d)||it.sold||S.money-price<moneyFloor()||conReason(d,'shop',false))return;
+  if(target)cancelTarget();
+  S.money-=price;it.sold=true;curShop().bought.push(d.id);
   S.cons.push({...d});useCon(S.cons.length-1,'shop');
 }
 $("btnreroll").onclick=()=>{ const rc=S.freeReroll||S.rerollTickets>0?0:S.rerollCost; if(S.money-rc<moneyFloor()) return; S.money-=rc; if(S.freeReroll) S.freeReroll=false; else if(S.rerollTickets>0)S.rerollTickets--; else S.rerollCost+=2; curShop().rerolls++; rollShop(); audio.effect("shuffle"); renderShop(); };
@@ -1086,33 +1168,62 @@ function growBoard(){
 }
 
 // ---------- consumables ----------
-function instantCon(d){return ['clock','polish','grease','hotwire'].includes(d.id);}
+function instantCon(d){return ['clock','polish','grease','hotwire','read_head','service_pass','credit_chip','scrap_cache'].includes(d.id);}
+function conNeighbors(t){return allTiles().filter(other=>Math.abs(other.r-t.r)+Math.abs(other.c-t.c)===1);}
+function conEmptyCorners(){return emptyCells().filter(([r,c])=>(r===0||r===S.N-1)&&(c===0||c===S.N-1));}
+function conTileReason(d,t,picks=[]){
+  if(['patch_cable','echo_chip','skip_trace','line_driver','plasma_cutter','heat_sink'].includes(d.id)&&isFixed(t))return 'That tile is locked in place';
+  if(d.id==='patch_cable'){
+    if(!picks.length&&!t.enh)return 'Choose an enhanced tile first';
+    if(picks.length&&(t.enh||t.rock||t.id===picks[0].id))return 'Choose a different, plain tile';
+  }
+  if(d.id==='echo_chip'){
+    if(!t.enh)return 'Choose an enhanced tile';
+    if(!conNeighbors(t).some(other=>!other.rock&&!other.enh&&!isFixed(other)))return 'Needs a plain tile touching it';
+  }
+  if(d.id==='skip_trace'&&!conEmptyCorners().length)return 'Needs an empty corner';
+  if(d.id==='line_driver'&&S.grid[t.r].some(other=>other&&isFixed(other)))return 'A frozen tile or wall blocks this row';
+  if(d.id==='heat_sink'&&(!t.enh||t.v>32))return 'Choose an enhanced tile of 32 or less';
+  return '';
+}
 function deckDef(d){
   const kinds={promote:'promote',twin:'clone',burn:'remove',temper:'random',recast_item:'replace',split_item:'split',eraser:'remove',halve:'halve',double:'promote'};
   const kind=d.stamp?'stamp':kinds[d.id];
   return kind?{...d,kind,count:kind==='replace'?2:1}:null;
 }
 function boardTargets(d){return d.deck||d.stamp?(d.id==='recast_item'?2:1):d.targets;}
-function conReason(d,place){
+function conReason(d,place,held=true){
+  if(d.id==='read_head'&&S.pile.length<2)return 'Needs at least two upcoming draws';
+  if(d.id==='service_pass'&&(S.rerollTickets||0)>2)return 'Room for two tickets needed · max 4';
+  if(d.id==='credit_chip'&&(S.creditChipsUsed||0)>=3)return 'All three chips redeemed';
+  if(d.id==='scrap_cache'&&S.maxCons-S.cons.length<(held?1:2))return held?'Needs one extra empty item slot':'Needs two empty item slots';
   if(d.id==='polish'&&S.polish>=3)return 'Polish is already ready';
   if(d.id==='grease'&&S.grease>=4)return 'Grease is already ready';
   if(d.id==='hotwire'&&!S.fixtures.length)return 'Install a fixture first';
   if(d.id==='hotwire'&&S.hotwire>=3)return 'Hot Wire is already ready';
   if(d.id==='wrench')return S.fixtures.length?'':'Install a fixture first';
   if(d.id==='stack')return place==='pack'?'Use before opening a pack':S.pile.length>1?'':'Needs at least two upcoming draws';
-  if(place==='shop')return instantCon(d)?'':deckDef(d)?'Use on the board or in a Blueprint / Oddity pack':'Use on the board';
+  if(place==='shop')return instantCon(d)?'':deckDef(d)?'Use on the board or in a Blueprint / Blacksite pack':'Use on the board';
   if(place==='pack'){
-    if(!S.pendingJobPack)return 'Open a Blueprint or Oddity pack first';
+    if(!S.pendingJobPack)return 'Open a Blueprint or Blacksite pack first';
     if(instantCon(d))return '';
     const def=deckDef(d);return def?editReason(def,packHand()):'Board only';
   }
   if(S.phase!=='round')return 'Use during a round';
+  if(['patch_cable','echo_chip','skip_trace','line_driver','plasma_cutter','heat_sink'].includes(d.id)){
+    const tiles=allTiles().filter(t=>!t.rock&&!isFixed(t));
+    if(d.id==='patch_cable'&&!tiles.some(t=>!t.enh))return 'Needs a plain tile to receive the finish';
+    if(!tiles.some(t=>!conTileReason(d,t)))return d.id==='skip_trace'?'Needs an empty corner':d.id==='heat_sink'?'Needs an enhanced tile of 32 or less':d.id==='echo_chip'?'Needs an enhanced tile beside a plain one':d.id==='patch_cable'?'Needs an enhanced tile':'No eligible tiles';
+  }
   if((d.id==='twin'||d.id==='split_item')&&!emptyCells().length)return 'Needs an empty cell';
   if(d.id==='undo'&&!undoSnap)return 'No move to undo';
   return '';
 }
 function conDescription(d,place){
   if(d.stamp)return 'Give one '+(place==='pack'?'deck ':'')+'tile '+ENH[d.stamp].name+'. '+ENH[d.stamp].desc;
+  if(d.id==='clock'&&S.clockBonus)return d.desc.replace('+6','+'+(6+S.clockBonus));
+  if(d.id==='credit_chip')return d.desc+' '+Math.max(0,3-(S.creditChipsUsed||0))+' redemptions left.';
+  if(d.id==='service_pass')return d.desc+' '+(S.rerollTickets||0)+' held.';
   return d.desc.replace('Needs a free slot.','Needs a free '+(place==='pack'?'deck slot.':'cell.'));
 }
 function renderItemRack(container,place){
@@ -1134,7 +1245,7 @@ function useCon(i,place='board'){
   const targets=boardTargets(d);
   if(targets>0){
     target={idx:i,def:{...d,targets},picks:[]};$("board").classList.add("targeting");renderCons();syncTiles();
-    hint(d.id==='recast_item'?'Pick the tile to copy, then the tile to replace. Esc to cancel.':targets===2?'Pick two tiles to swap. Esc to cancel.':'Pick a tile. Esc to cancel.',true);return;
+    hint(d.id==='patch_cable'?'Pick the enhanced tile, then a plain tile. Esc to cancel.':d.id==='line_driver'?'Pick a tile in the row to shift right. Esc to cancel.':d.id==='recast_item'?'Pick the tile to copy, then the tile to replace. Esc to cancel.':targets===2?'Pick two tiles to swap. Esc to cancel.':'Pick a tile. Esc to cancel.',true);return;
   }
   let ok=true;
   if(d.id==="shuffle"){ shuffleBoard(); }
@@ -1142,19 +1253,28 @@ function useCon(i,place='board'){
   else if(d.id==="undo"){ if(!undoSnap){ hint("Nothing to undo.",true); ok=false; } else { restore(undoSnap); undoSnap=null; } }
   else if(d.id==="jack"){ let k=0; allTiles().forEach(t=>{ if(t.rock&&!t.fixed){ S.grid[t.r][t.c]=null; k++; } }); if(!k){ hint("No rubble to clear.",true); ok=false; } }
   else if(d.id==="clock"){
-    if(S.phase==='shop')S.nextMoves=(S.nextMoves||0)+6;
-    else {S.moves+=6;curRound().movesAllowed+=6;}
+    const moves=6+(S.clockBonus||0);
+    if(S.phase==='shop')S.nextMoves=(S.nextMoves||0)+moves;
+    else {S.moves+=moves;curRound().movesAllowed+=moves;}
   }
   else if(d.id==="polish"){ S.polish=3; }
   else if(d.id==='grease'){S.grease=4;}
   else if(d.id==='hotwire'){S.hotwire=3;}
+  else if(d.id==='read_head'){S.pile.unshift(...S.pile.splice(0,3).reverse());}
+  else if(d.id==='service_pass'){S.rerollTickets=(S.rerollTickets||0)+2;}
+  else if(d.id==='credit_chip'){S.money+=5;S.creditChipsUsed=(S.creditChipsUsed||0)+1;}
+  else if(d.id==='scrap_cache'){
+    const pool=CONS.filter(c=>['eraser','halve','swap','shuffle','jack'].includes(c.id));
+    for(let n=0;n<2;n++){const at=Math.floor(S.rng()*pool.length);S.cons.push({...pool.splice(at,1)[0]});}
+  }
   if(!ok) return;
   finishCon(i);
 }
 function pickTile(t){
   if(!target) return;
-  if(t.rock&&target.def.id!=="eraser"){ hint("Rubble only comes out with an Eraser or a Jackhammer.",true); return; }
+  if(t.rock&&!['eraser','plasma_cutter'].includes(target.def.id)){ hint("Rubble needs a clearing tool.",true); return; }
   if(t.id===S.frozen){ hint("That tile is frozen.",true); return; }
+  const reason=conTileReason(target.def,t,target.picks);if(reason){hint(reason+'.',true);return;}
   if(target.def.id==='split_item'&&t.v<4){hint('Choose a tile of 4 or more.',true);return;}
   target.picks.push(t);
   if(target.picks.length<target.def.targets){ syncTiles(); return; }
@@ -1165,6 +1285,21 @@ function pickTile(t){
   else if(d.id==="halve"){ if(a.v===2) S.grid[a.r][a.c]=null; else a.v/=2; }
   else if(d.id==="double"||d.id==='promote'){ a.v*=2; markMadeValue(a.v); }
   else if(d.id==='temper'){const keys=Object.keys(ENH);a.enh=keys[Math.floor(S.rng()*keys.length)];}
+  else if(d.id==='patch_cable'){b.enh=a.enh;a.enh=null;}
+  else if(d.id==='echo_chip'){
+    conNeighbors(a).filter(t=>!t.rock&&!t.enh&&!isFixed(t)).slice(0,2).forEach(t=>{t.enh=a.enh;});
+  }
+  else if(d.id==='skip_trace'){
+    const [r,c]=conEmptyCorners().sort((x,y)=>(Math.abs(x[0]-a.r)+Math.abs(x[1]-a.c))-(Math.abs(y[0]-a.r)+Math.abs(y[1]-a.c)))[0];
+    S.grid[a.r][a.c]=null;a.r=r;a.c=c;S.grid[r][c]=a;
+  }
+  else if(d.id==='line_driver'){
+    const row=S.grid[a.r];row.unshift(row.pop());row.forEach((t,c)=>{if(t)t.c=c;});
+  }
+  else if(d.id==='plasma_cutter'){
+    conNeighbors(a).filter(t=>t.rock&&!isFixed(t)).forEach(t=>{S.grid[t.r][t.c]=null;});S.grid[a.r][a.c]=null;
+  }
+  else if(d.id==='heat_sink'){a.v*=2;a.enh=null;markMadeValue(a.v);}
   else if(d.id==='twin'||d.id==='split_item'){
     const cells=emptyCells();if(!cells.length){hint('Needs an empty cell.',true);target.picks=[];return;}
     if(d.id==='split_item')a.v/=2;
@@ -1198,13 +1333,83 @@ const WORKSHOP=[
  {id:'dividend',kind:'dividend',name:'Dividend',ico:'$+',count:0,desc:'Gain $1 for every $2 you hold after buying this pack, up to $12.'},
  {id:'parcel',kind:'parcel',name:'Supply Parcel',ico:'▧',count:0,desc:'Receive two different board tools. Needs two empty item slots.'},
  {id:'pocket',kind:'pocket',name:'Side Pocket',ico:'⊔',count:0,desc:'Carry one extra item for the rest of this run. Maximum 5 slots.'},
- {id:'tickets',kind:'tickets',name:'Ticket Roll',ico:'↻',count:0,desc:'Your next two shop rerolls are free. Tickets carry between shops.'},
+ {id:'tickets',kind:'tickets',name:'Ticket Roll',ico:'↻',count:0,desc:'Your next two shop rerolls are free. Tickets carry between shops; hold at most 4.'},
+ {id:'bp_splice',kind:'splice',name:'Splice',ico:'⇢',count:2,labels:['Donor','Receiver'],steps:['Choose the enhanced donor.','Choose the tile receiving its finish.'],desc:'Move a finish from one tile to another. The donor becomes plain; both values stay the same.',
+  checkHand:cards=>cards.some(a=>a.enh&&cards.some(b=>a!==b&&a.enh!==b.enh))?'':'Needs a finish that can be transferred',
+  checkPick:cards=>!cards[0].enh?'The donor needs a finish':cards[0].enh===cards[1].enh?'Choose a receiver with a different finish':'',
+  review:(cards,name)=>name(cards[0])+' becomes plain '+cards[0].v+'. '+name(cards[1])+' becomes '+ENH[cards[0].enh].name+' '+cards[1].v+'.',
+  run:cards=>{cards[1].enh=cards[0].enh;cards[0].enh=null;}},
+ {id:'bp_crosswire',kind:'crosswire',name:'Crosswire',ico:'⇄',count:2,desc:'Swap the finishes on two tiles. Plain counts as a finish. Their values stay the same.',
+  checkHand:cards=>cards.some(a=>cards.some(b=>a.enh!==b.enh))?'':'Needs two different finishes in this hand',
+  checkPick:cards=>cards[0].enh===cards[1].enh?'Choose two different finishes':'',
+  review:(cards,name)=>name(cards[0])+' → '+name({...cards[0],enh:cards[1].enh})+'. '+name(cards[1])+' → '+name({...cards[1],enh:cards[0].enh})+'.',
+  run:cards=>{[cards[0].enh,cards[1].enh]=[cards[1].enh,cards[0].enh];}},
+ {id:'bp_downlink',kind:'downlink',name:'Downlink',ico:'↓↓',count:2,desc:'Halve two tiles of 4 or more. Both keep their finishes.',canPick:card=>card.v>=4,
+  review:(cards,name)=>cards.map(c=>name(c)+' → '+name({...c,v:c.v/2})).join('. ')+'.',run:cards=>{cards.forEach(c=>{c.v/=2;});}},
+ {id:'bp_pairing',kind:'pairing',name:'Pairing',ico:'==',count:2,desc:'Choose two different values. Lower the larger tile to match the smaller. Both keep their finishes.',
+  checkHand:cards=>cards.some(a=>cards.some(b=>a.v!==b.v))?'':'Needs two different values in this hand',
+  checkPick:cards=>cards[0].v===cards[1].v?'These values already match':'',
+  review:(cards,name)=>{const high=cards[0].v>cards[1].v?cards[0]:cards[1],v=Math.min(...cards.map(c=>c.v));return name(high)+' → '+name({...high,v})+'. The smaller tile stays unchanged.';},
+  run:cards=>{const v=Math.min(...cards.map(c=>c.v));cards.forEach(c=>{c.v=v;});}},
+ {id:'bp_salvage',kind:'salvage',name:'Salvage',ico:'$−',count:2,minCount:1,desc:'Strip the finishes from up to two tiles. Collect $3 per finish. Tile values stay the same.',canPick:card=>!!card.enh,
+  review:(cards,name)=>'Strip '+cards.map(name).join(' and ')+'. Collect $'+(cards.length*3)+'. No tiles are removed.',
+  run:cards=>{cards.forEach(c=>{c.enh=null;});S.money+=cards.length*3;}},
+ {id:'bp_bootstrap',kind:'bootstrap',name:'Bootstrap',ico:'2↑',count:1,desc:'Double one plain 2 or 4. The new tile stays plain; maximum result 8.',canPick:card=>!card.enh&&card.v<=4,
+  review:cards=>'Plain '+cards[0].v+' → plain '+(cards[0].v*2)+'.',run:cards=>{cards[0].v*=2;}},
+ {id:'bp_multicast',kind:'multicast',name:'Multicast',ico:'Ⅲ',count:1,desc:'Add two plain copies of a tile worth 8 or less. Its finish is not copied. Needs two free deck slots.',canPick:card=>card.v<=8,
+  checkHand:()=>S.deck.length>DECK_CAP-2?'Needs two free deck slots':'',
+  review:cards=>'Add two plain '+cards[0].v+'s. Original unchanged. Deck: '+S.deck.length+' → '+(S.deck.length+2)+'.',
+  run:cards=>{S.deck.push({v:cards[0].v,enh:null},{v:cards[0].v,enh:null});}},
+ {id:'bp_reboot',kind:'reboot',name:'Reboot',ico:'02',count:2,desc:'Reset two tiles to plain 2s. Both values and finishes are erased.',canPick:card=>card.v!==2||!!card.enh,
+  review:(cards,name)=>cards.map(name).join(' and ')+' → two plain 2s. Deck size stays '+S.deck.length+'.',
+  run:cards=>{cards.forEach(c=>Object.assign(c,{v:2,enh:null}));}},
+ {id:'bp_service_window',kind:'service_window',name:'Service Window',ico:'+4',count:0,cost:2,desc:'Pay $2 for 4 extra moves next round. Requires at most 8 moves already banked.',
+  checkHand:()=>((S.nextMoves||0)>8?'Already more than 8 moves banked':''),
+  review:()=> 'Next round bonus: '+(S.nextMoves||0)+' → '+((S.nextMoves||0)+4)+' moves.',run:()=>{S.nextMoves=(S.nextMoves||0)+4;}},
+ {id:'bp_bypass_lead',kind:'bypass_lead',name:'Bypass Lead',ico:'▦+',count:0,moveCost:2,desc:'Unlock a fourth fixture slot. Permanently lose 2 moves per round. Four slots maximum.',
+  checkHand:()=>S.maxFixtures>=4?'All four fixture slots unlocked':'',
+  review:()=> 'Fixture capacity: '+S.maxFixtures+' → 4. Existing fixtures stay in place.',run:()=>{S.maxFixtures=4;}},
 ];
 const EXPERIMENTS=[
  {id:'kiln',kind:'kiln',name:'Kiln',ico:'◇',count:2,desc:'Make 2 deck tiles Prism. Permanently lose 2 moves per round. Maximum 3 uses.'},
  {id:'smelt',kind:'smelt',name:'Smelt',ico:'▦',count:2,desc:'Destroy 2 deck tiles. Add one Iron 8. Your deck becomes one tile smaller.'},
  {id:'fracture',kind:'split',name:'Fracture',ico:'½',count:1,desc:'Split a tile into two halves. Both keep its enhancement. Needs a free slot.'},
  {id:'reforge',kind:'reforge',name:'Reforge',ico:'8',count:3,desc:'Turn 3 deck tiles into plain 8s. Their enhancements are removed.'},
+ {id:'bs_mirror_rom',kind:'mirror_rom',name:'Mirror ROM',ico:'Ⅲ',count:3,cost:4,labels:['Template','Overwrite','Overwrite'],steps:['Choose a template worth 32 or less.','Choose the first tile to overwrite.','Choose the second tile to overwrite.'],desc:'Pay $4. Copy a tile worth 32 or less onto two other tiles, including its finish. Deck size stays the same.',
+  checkHand:cards=>cards.some(c=>c.v<=32)?'':'No template of 32 or less in this hand',
+  checkPick:cards=>cards[0].v>32?'Template must be worth 32 or less':cards.slice(1).every(c=>c.v===cards[0].v&&c.enh===cards[0].enh)?'Both tiles already match the template':'',
+  review:(cards,name)=>'Overwrite '+cards.slice(1).map(name).join(' and ')+' with '+name(cards[0])+'. The template stays unchanged.',
+  run:cards=>{const {v,enh}=cards[0];cards.slice(1).forEach(c=>Object.assign(c,{v,enh}));}},
+ {id:'bs_black_ice',kind:'black_ice',name:'Black Ice',ico:'▥',count:3,moveCost:2,maxUses:2,desc:'Give three tiles Iron. Permanently lose 2 moves per round. Twice per run maximum.',canPick:card=>card.enh!=='steel',
+  review:(cards,name)=>cards.map(name).join(', ')+' all gain Iron. Values stay the same.',run:cards=>{cards.forEach(c=>{c.enh='steel';});}},
+ {id:'bs_glass_cannon',kind:'glass_cannon',name:'Glass Cannon',ico:'◇↑',count:1,moveCost:1,maxUses:3,desc:'Quadruple a tile worth 16 or less and give it Prism. Permanently lose 1 move per round. Three uses per run.',canPick:card=>card.v<=16,
+  review:(cards,name)=>name(cards[0])+' → Prism '+(cards[0].v*4)+'. Its previous finish is lost.',run:cards=>{cards[0].v*=4;cards[0].enh='glass';}},
+ {id:'bs_counterfeit',kind:'counterfeit',name:'Counterfeit',ico:'$$',count:2,cost:5,desc:'Pay $5 to give two tiles Brass. Their values stay the same.',canPick:card=>card.enh!=='gold',
+  review:(cards,name)=>cards.map(name).join(' and ')+' both gain Brass. Previous finishes are lost.',run:cards=>{cards.forEach(c=>{c.enh='gold';});}},
+ {id:'bs_loaded_dice',kind:'loaded_dice',name:'Loaded Dice',ico:'★★',count:3,cost:4,desc:'Pay $4 to give three tiles Odds. Their values stay the same.',canPick:card=>card.enh!=='lucky',
+  review:(cards,name)=>cards.map(name).join(', ')+' all gain Odds. Previous finishes are lost.',run:cards=>{cards.forEach(c=>{c.enh='lucky';});}},
+ {id:'bs_memory_hole',kind:'memory_hole',name:'Memory Hole',ico:'∅',count:3,cost:3,desc:'Pay $3 to destroy three tiles. Keep at least 12 in the deck.',
+  checkHand:()=>S.deck.length<DECK_MIN+3?'Needs at least 15 deck tiles':'',
+  review:(cards,name)=>'Destroy '+cards.map(name).join(', ')+'. Deck: '+S.deck.length+' → '+(S.deck.length-3)+'.',
+  run:cards=>{cards.forEach(c=>S.deck.splice(S.deck.indexOf(c),1));}},
+ {id:'bs_mass_driver',kind:'mass_driver',name:'Mass Driver',ico:'2→1',count:2,cost:2,desc:'Pay $2. Fuse two equal tiles worth 32 or less into one plain tile of twice the value. Keep at least 12 deck tiles.',canPick:card=>card.v<=32,
+  checkHand:cards=>S.deck.length<=DECK_MIN?'Needs at least 13 deck tiles':cards.some(a=>a.v<=32&&cards.some(b=>a!==b&&a.v===b.v))?'':'Needs a matching pair of 32 or less',
+  checkPick:cards=>cards[0].v===cards[1].v?'':'Choose two equal values',
+  review:(cards,name)=>name(cards[0])+' + '+name(cards[1])+' → plain '+(cards[0].v*2)+'. Deck: '+S.deck.length+' → '+(S.deck.length-1)+'. Both finishes are lost.',
+  run:cards=>{cards[0].v*=2;cards[0].enh=null;S.deck.splice(S.deck.indexOf(cards[1]),1);}},
+ {id:'bs_ghost_image',kind:'ghost_image',name:'Ghost Image',ico:'Ⅲ◇',count:1,cost:4,desc:'Pay $4. Add two exact copies of a tile worth 16 or less, including its finish. Needs two free deck slots.',canPick:card=>card.v<=16,
+  checkHand:()=>S.deck.length>DECK_CAP-2?'Needs two free deck slots':'',
+  review:(cards,name)=>'Add two '+name(cards[0])+' tiles. Original unchanged. Deck: '+S.deck.length+' → '+(S.deck.length+2)+'.',
+  run:cards=>{const {v,enh}=cards[0];S.deck.push({v,enh},{v,enh});}},
+ {id:'bs_dead_drop',kind:'dead_drop',name:'Dead Drop',ico:'Ⅵ−',count:1,cost:5,desc:'Pay $5 and destroy one enhanced tile to unlock a sixth mod slot. Keep at least 12 tiles. Six slots maximum.',canPick:card=>!!card.enh,
+  checkHand:()=>S.maxCharms>=6?'All six mod slots unlocked':S.deck.length<=DECK_MIN?'Needs at least 13 deck tiles':'',
+  review:(cards,name)=>'Destroy '+name(cards[0])+'. Mod slots: '+S.maxCharms+' → 6. Deck: '+S.deck.length+' → '+(S.deck.length-1)+'.',
+  run:cards=>{S.deck.splice(S.deck.indexOf(cards[0]),1);S.maxCharms=6;}},
+ {id:'bs_neon_bloom',kind:'neon_bloom',name:'Neon Bloom',ico:'+×',count:2,cost:3,labels:['Kick','Plus'],desc:'Pay $3. Give Kick and Plus to two equal plain tiles worth 16 or less. Their values stay the same.',canPick:card=>!card.enh&&card.v<=16,
+  checkHand:cards=>cards.some(a=>!a.enh&&a.v<=16&&cards.some(b=>a!==b&&!b.enh&&a.v===b.v))?'':'Needs two equal plain tiles of 16 or less',
+  checkPick:cards=>cards[0].v===cards[1].v?'':'Choose two equal values',
+  review:cards=>'Plain '+cards[0].v+' + plain '+cards[1].v+' → Kick '+cards[0].v+' + Plus '+cards[1].v+'. Merge them on the board to trigger Overprint.',
+  run:cards=>{cards[0].enh='bonus';cards[1].enh='mult';}},
 ];
 let deckJob=null;
 const EDIT_HAND_SIZE=8;
@@ -1222,18 +1427,25 @@ function recordDeckEdit(kind,before,after){
 }
 function editReason(d,hand=null){
   if(d.kind==='fixture')return installReason(d.fixture);
+  if(d.cost&&S.money-d.cost<moneyFloor())return 'Needs $'+d.cost+' in addition to the pack';
+  if(d.maxUses&&(S.packUses?.[d.id]||0)>=d.maxUses)return d.name+' limit reached';
+  if(d.moveCost&&S.bonusMoves-d.moveCost< -8)return 'Cannot reduce the permanent move bonus below −8';
   if(d.kind==='dividend'&&S.money<2)return 'Needs cash on hand';
   if(d.kind==='parcel'&&S.maxCons-S.cons.length<2)return 'Needs two empty item slots';
   if(d.kind==='pocket'&&S.maxCons>=5)return 'All five item slots unlocked';
+  if(d.kind==='tickets'&&(S.rerollTickets||0)>2)return 'Room for two tickets needed · max 4';
   if((d.kind==='clone'||d.kind==='split')&&S.deck.length>=DECK_CAP) return 'Deck full · trim first';
   if(d.kind==='remove'&&S.deck.length<=DECK_MIN) return 'Minimum deck size';
   if(d.kind==='smelt'&&S.deck.length<=DECK_MIN) return 'Needs at least 13 tiles';
   if(d.kind==='kiln'&&(S.kilnUses||0)>=3) return 'Kiln limit reached';
+  if(d.kind==='kiln'&&S.bonusMoves-2< -8)return 'Cannot reduce the permanent move bonus below −8';
   const cards=hand||S.deck;
+  if(d.checkHand){const reason=d.checkHand(cards);if(reason)return reason;}
+  if(d.canPick&&cards.filter(d.canPick).length<(d.minCount||d.count||1))return 'Not enough eligible tiles in this hand';
   if(d.kind==='split'&&!cards.some(c=>c.v>=4)) return 'No tile of 4 or more in this hand';
   if(d.kind==='stamp'&&d.stamp&&!cards.some(c=>c.enh!==d.stamp))return 'Every tile already has '+ENH[d.stamp].name;
   if(d.kind==='halve'&&!cards.some(c=>c.v>2||S.deck.length>DECK_MIN))return 'Cannot remove a tile at minimum deck size';
-  if(d.count!==0&&cards.length<(d.kind==='remove'?1:d.count||1))return 'Not enough tiles left in this hand';
+  if(d.count!==0&&cards.length<(d.kind==='remove'?1:d.minCount||d.count||1))return 'Not enough tiles left in this hand';
   return '';
 }
 function openJobPack(pack){
@@ -1250,11 +1462,12 @@ function renderJobPack(){
   const pending=S.pendingJobPack,{pack,kind,options,taken,remaining}=pending;
   const source=kind==='workshop'?'workshop-pack':'backroom-pack';
   $('packtitle').textContent=packName(pack);
-  $('packnote').textContent='Choose '+remaining+' more. Effects are included in the price. No refunds.';
+  $('packnote').textContent='Choose '+remaining+' more. Some cards have an extra cost. No refunds.';
   const g=$('packgrid');g.innerHTML='';g.classList.toggle('expanded',options.length>3);
   options.forEach(d=>{
     const used=taken.includes(d.id),reason=editReason(d,packHand()),el=document.createElement('button');el.className='opt job-opt'+(used?' taken':'');
-    el.innerHTML='<div class="job-opt-mark">'+d.ico+'</div><div class="nm">'+d.name+'</div><div class="ds">'+d.desc+'</div><small class="pack-tag">'+(used?'Used':reason||(d.kind==='fixture'?'BOARD FIXTURE':kind==='workshop'?'WORKSHOP':'BACKROOM'))+'</small>';
+    const desc=d.kind==='fixture'?'Install on one cell for the run. '+fixtureDescription(d.fixture):d.desc;
+    el.innerHTML='<div class="job-opt-mark">'+d.ico+'</div><div class="nm">'+d.name+'</div><div class="ds">'+desc+'</div><small class="pack-tag">'+(used?'Used':reason||(d.kind==='fixture'?'BOARD FIXTURE':kind==='workshop'?'BLUEPRINT':'BLACKSITE'))+'</small>';
     el.disabled=used||!!reason;
     el.onclick=()=>{if(S.pendingJobPack!==pending||taken.includes(d.id))return;beginDeckJob(d,{source,price:0,hand:packHand()});};
     g.appendChild(el);
@@ -1274,21 +1487,23 @@ function beginDeckJob(def,options={}){
   if(def.kind==='fixture'){beginBoardJob({kind:'install',fixture:def.fixture,source:'pack',packId:def.id});return;}
   const hand=options.hand||packHand();
   const reason=editReason(def,hand);if(reason){hint(reason,true);return;}
-  deckJob={def,source:options.source||'item',idx:options.idx,price:options.price||0,picks:[],enh:def.stamp||null,hand};
+  deckJob={def,source:options.source||'item',idx:options.idx,price:(options.price||0)+(def.cost||0),picks:[],enh:def.stamp||null,hand};
   renderDeckJob();show('ov-deckedit');
 }
 function renderDeckJob(){
   const job=deckJob,d=job.def,picks=job.picks;
+  const costs=[job.price?'$'+job.price:'',d.moveCost?d.moveCost+' fewer moves every round':''].filter(Boolean);
+  const costNote=costs.length?' Cost: '+costs.join(' and ')+'.':'';
   $('editname').textContent=d.name;
   $('editdesc').textContent=d.desc;
   if(d.count===0){
     $('editstep').textContent='Use now';$('editenh').hidden=true;$('editgrid').innerHTML='';
-    $('editpreview').textContent=d.kind==='dividend'?'Collect $'+Math.min(12,Math.floor(Math.max(0,S.money)/2))+'.':d.kind==='pocket'?'Item slots: '+S.maxCons+' → '+(S.maxCons+1)+'.':d.kind==='tickets'?'Add 2 free reroll tickets.': 'Open the parcel for two different board tools.';
-    $('editcount').textContent='Run upgrade';$('btneditapply').textContent='Use';$('btneditapply').disabled=!!editReason(d,job.hand);return;
+    $('editpreview').textContent=(d.review?d.review([]):d.kind==='dividend'?'Collect $'+Math.min(12,Math.floor(Math.max(0,S.money)/2))+'.':d.kind==='pocket'?'Item slots: '+S.maxCons+' → '+(S.maxCons+1)+'.':d.kind==='tickets'?'Add 2 free reroll tickets.': 'Open the parcel for two different board tools.')+costNote;
+    $('editcount').textContent='Run upgrade';$('btneditapply').textContent='Use'+(job.price?' · $'+job.price:'');$('btneditapply').disabled=!!editReason(d,job.hand)||S.money-job.price<moneyFloor();return;
   }
   const need=d.count||(d.kind==='replace'?2:1);
-  $('editstep').textContent=d.kind==='replace'?(picks.length===0?'1 / Choose the tile to copy.':picks.length===1?'2 / Choose the tile to replace.':'Review your conversion.'):
-    'Choose '+(d.kind==='remove'?'up to ':'')+need+' tile'+(need>1?'s':'')+' · '+picks.length+' selected';
+  $('editstep').textContent=d.steps?(d.steps[picks.length]||'Review your conversion.'):d.kind==='replace'?(picks.length===0?'1 / Choose the tile to copy.':picks.length===1?'2 / Choose the tile to replace.':'Review your conversion.'):
+    'Choose '+(d.kind==='remove'||d.minCount?'up to ':'')+need+' tile'+(need>1?'s':'')+' · '+picks.length+' selected';
   const enh=$('editenh');enh.innerHTML='';enh.hidden=d.kind!=='stamp'||!!d.stamp;
   if(d.kind==='stamp'&&!d.stamp)Object.entries(ENH).forEach(([id,e])=>{
     const button=document.createElement('button');button.className='enh-choice'+(job.enh===id?' selected':'');
@@ -1299,11 +1514,11 @@ function renderDeckJob(){
   job.hand.filter(card=>S.deck.includes(card)).forEach(card=>{
     const i=S.deck.indexOf(card);
     const selected=picks.indexOf(i),b=document.createElement('button');b.className='edit-tile'+(selected>=0?' selected':'');
-    const ineligible=(d.kind==='split'&&card.v<4)||(d.kind==='stamp'&&card.enh===job.enh)||(d.kind==='halve'&&card.v===2&&S.deck.length<=DECK_MIN)||(d.kind==='remove'&&picks.length>=Math.min(need,S.deck.length-DECK_MIN)&&selected<0);
+    const ineligible=(d.canPick&&!d.canPick(card))||(d.kind==='split'&&card.v<4)||(d.kind==='stamp'&&card.enh===job.enh)||(d.kind==='halve'&&card.v===2&&S.deck.length<=DECK_MIN)||(d.kind==='remove'&&picks.length>=Math.min(need,S.deck.length-DECK_MIN)&&selected<0);
     b.disabled=ineligible;
     b.setAttribute('aria-pressed',String(selected>=0));b.setAttribute('aria-label',(card.enh?ENH[card.enh].name+' ':'')+card.v+', tile '+(i+1)+(selected>=0?', selected '+(selected+1):''));
     b.appendChild(miniTile(card));
-    const label=document.createElement('span');label.className='edit-tile-label';label.textContent=selected>=0?(d.kind==='replace'?(selected===0?'Template':'Replace'):'Selected '+(selected+1)):card.enh?ENH[card.enh].name:'Plain';b.appendChild(label);
+    const label=document.createElement('span');label.className='edit-tile-label';label.textContent=selected>=0?(d.labels?d.labels[selected]:d.kind==='replace'?(selected===0?'Template':'Replace'):'Selected '+(selected+1)):card.enh?ENH[card.enh].name:'Plain';b.appendChild(label);
     b.onclick=()=>{
       if(selected>=0)picks.splice(selected,1);
       else if(picks.length<need)picks.push(i);
@@ -1311,11 +1526,14 @@ function renderDeckJob(){
       renderDeckJob();
     };grid.appendChild(b);
   });
-  const valid=(d.kind==='remove'?picks.length>0:picks.length===need)&&(d.kind!=='stamp'||job.enh);
+  const countReady=picks.length>=(d.kind==='remove'?1:d.minCount||need)&&picks.length<=need;
+  const pickReason=countReady&&d.checkPick?d.checkPick(picks.map(i=>S.deck[i])):'';
+  const valid=countReady&&!pickReason&&(d.kind!=='stamp'||job.enh);
   const preview=$('editpreview');preview.textContent='';
   if(valid){
     const cards=picks.map(i=>S.deck[i]);const name=c=>(c.enh?ENH[c.enh].name+' ':'')+c.v;
-    if(d.kind==='replace')preview.textContent=name(cards[1])+' → '+name(cards[0])+'. Deck size stays '+S.deck.length+'.';
+    if(d.review)preview.textContent=d.review(cards,name);
+    else if(d.kind==='replace')preview.textContent=name(cards[1])+' → '+name(cards[0])+'. Deck size stays '+S.deck.length+'.';
     else if(d.kind==='remove')preview.textContent='Remove '+cards.map(name).join(' and ')+'. '+(S.deck.length-cards.length)+' tiles remain.';
     else if(d.kind==='clone')preview.textContent='Add one '+name(cards[0])+'. Deck: '+S.deck.length+' → '+(S.deck.length+1)+'.';
     else if(d.kind==='stamp')preview.textContent=name(cards[0])+' → '+ENH[job.enh].name+' '+cards[0].v+'. Future draws use the new enhancement.';
@@ -1326,7 +1544,8 @@ function renderDeckJob(){
     else if(d.kind==='promote')preview.textContent=name(cards[0])+' → '+name({...cards[0],v:cards[0].v*2})+'.';
     else if(d.kind==='halve')preview.textContent=cards[0].v===2?'Remove '+name(cards[0])+'.':name(cards[0])+' → '+name({...cards[0],v:cards[0].v/2})+'.';
     else preview.textContent='Give '+name(cards[0])+' a random enhancement.';
-  }else preview.textContent=d.kind==='stamp'&&!job.enh?'Choose an enhancement and a tile.':'Choose your tiles above.';
+    preview.textContent+=costNote;
+  }else preview.textContent=pickReason||(d.kind==='stamp'&&!job.enh?'Choose an enhancement and a tile.':'Choose your tiles above.');
   $('btneditapply').disabled=!valid||!!editReason(d,job.hand)||S.money-job.price<moneyFloor();
   $('btneditapply').textContent='Apply'+(job.price?' · $'+job.price:'');
   $('editcount').textContent=job.hand.filter(c=>S.deck.includes(c)).length+' tiles dealt · '+S.deck.length+' in deck';
@@ -1336,7 +1555,13 @@ function applyDeckJob(){
   const d=job.def,indices=job.picks,cards=indices.map(i=>({...S.deck[i]})),before=deckSummary();
   if(editReason(d,job.hand)||S.money-job.price<moneyFloor())return;
   if(d.count!==0&&(!indices.length||indices.some(i=>!job.hand.includes(S.deck[i]))||new Set(indices).size!==indices.length))return;
-  if(d.kind==='dividend')S.money+=Math.min(12,Math.floor(Math.max(0,S.money)/2));
+  if(d.count!==0){
+    const need=d.count||(d.kind==='replace'?2:1),minimum=d.kind==='remove'?1:d.minCount||need;
+    if(indices.length<minimum||indices.length>need||(d.canPick&&cards.some(c=>!d.canPick(c)))||(d.checkPick&&d.checkPick(cards)))return;
+    if(d.kind==='remove'&&S.deck.length-indices.length<DECK_MIN)return;
+  }
+  if(d.run)d.run(indices.map(i=>S.deck[i]));
+  else if(d.kind==='dividend')S.money+=Math.min(12,Math.floor(Math.max(0,S.money)/2));
   else if(d.kind==='pocket')S.maxCons++;
   else if(d.kind==='tickets')S.rerollTickets=(S.rerollTickets||0)+2;
   else if(d.kind==='parcel'){
@@ -1355,6 +1580,8 @@ function applyDeckJob(){
   else if(d.kind==='split'){S.deck[indices[0]].v/=2;S.deck.push({...S.deck[indices[0]]});}
   else if(d.kind==='reforge')indices.forEach(i=>Object.assign(S.deck[i],{v:8,enh:null}));
   S.money-=job.price;
+  if(d.moveCost)S.bonusMoves-=d.moveCost;
+  if(d.maxUses){S.packUses||={};S.packUses[d.id]=(S.packUses[d.id]||0)+1;}
   if(job.source.endsWith('-pack')){
     S.pendingJobPack.taken.push(d.id);S.pendingJobPack.remaining--;
     if(!S.pendingJobPack.remaining)S.pendingJobPack=null;
@@ -1382,7 +1609,7 @@ function cancelTarget(){ target=null; $("board").classList.remove("targeting"); 
 
 // ---------- end states ----------
 function statLines(){
-  return [["Reached","Ante "+S.ante+" · "+BLINDS[S.blind].name],["Rounds won",S.roundsWon],["Best single move",fmt(S.bestMove)],["Highest tile",fmt(maxTile())],["Charms",S.charms.map(c=>c.name).join(", ")||"none"],["Fixtures",fixtureSummary()],["Deck",deckSummary()]];
+  return [["Reached","Ante "+S.ante+" · "+BLINDS[S.blind].name],["Rounds won",S.roundsWon],["Best single move",fmt(S.bestMove)],["Highest tile",fmt(maxTile())],["Mods",S.charms.map(c=>c.name).join(", ")||"none"],["Fixtures",fixtureSummary()],["Deck",deckSummary()]];
 }
 function gameOver(reason){
   finishReveal();
@@ -1467,11 +1694,11 @@ function syncTiles(){
 function miniTile(c){ const d=document.createElement("div"); d.className="mini"; d.dataset.v=c.v; d.dataset.enh=c.enh||""; d.title=c.v+(c.enh?" · "+ENH[c.enh].name+": "+ENH[c.enh].desc:""); d.setAttribute("aria-label",d.title); d.textContent=c.v; if(c.enh){ const b=document.createElement("span"); b.className="eb"; b.textContent=ENH[c.enh].ico; d.appendChild(b); } return d; }
 function renderDeck(){
   if(!S) return;
-  const nr=$("nextrow"); nr.innerHTML="";
+  const nr=$("nextrow"); nr.innerHTML="";nr.classList.toggle("expanded",(S.previewDraws||3)>3);
   $("pilelbl").textContent=S.pile.length+" left";
-  const preview=S.pile.slice(0,3);
+  const previewCount=S.previewDraws||3,preview=S.pile.slice(0,previewCount);
   preview.forEach((c,i)=>{ nr.appendChild(miniTile(c)); if(i<preview.length-1){ const a=document.createElement("span"); a.className="arrow"; a.textContent="›"; nr.appendChild(a); } });
-  if(preview.length<3){ const s=document.createElement("span"); s.style.cssText="font-size:11px;color:var(--pink)"; s.textContent=preview.length?"then shuffle":"shuffling"; nr.appendChild(s); }
+  if(preview.length<previewCount){ const s=document.createElement("span"); s.style.cssText="font-size:11px;color:var(--pink)"; s.textContent=preview.length?"then shuffle":"shuffling"; nr.appendChild(s); }
   const comp=$("deckcomp"); comp.innerHTML="";
   const m={}; S.deck.forEach(c=>{ const k=c.v+"|"+(c.enh||""); m[k]=(m[k]||0)+1; });
   Object.keys(m).sort((a,b)=>parseInt(a)-parseInt(b)||a.localeCompare(b)).forEach(k=>{ const [v,e]=k.split("|"); const d=document.createElement("span"); d.className="dc"+(e?" enh":""); d.innerHTML="<i>"+v+"</i>"+(e?ENH[e].ico+" "+ENH[e].name.toLowerCase():"")+" ×"+m[k]; comp.appendChild(d); });
@@ -1586,7 +1813,7 @@ function inspectCharm(c){
   $('inspectname').textContent=c.name;
   $('inspecticon').textContent=c.ico;
   $('inspectdesc').innerHTML=descOf(c);
-  $('inspectrarity').textContent=({c:'Common charm',u:'Uncommon charm',r:'Rare charm'})[c.rar];
+  $('inspectrarity').textContent=({c:'Common mod',u:'Uncommon mod',r:'Rare mod'})[c.rar];
   show('ov-inspect');
 }
 function refreshAudio(){

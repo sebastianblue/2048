@@ -3,12 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#202c2b">
-<meta name="description" content="2048: ANTE. Build your deck. Beat the house.">
-<title>2048: ANTE</title>
-<link rel="icon" href="./favicon.svg" type="image/svg+xml">
+<meta name="theme-color" content="#090e18">
+<meta name="description" content="2048: ANTE — After Hours. An underground arcade roguelite. Build your grid, install mods, beat the house.">
+<title>2048: ANTE — After Hours</title>
+<link rel="icon" href="./favicon.svg?v=2.0.0" type="image/svg+xml">
 <link rel="stylesheet" href="./fonts.css">
-<link rel="stylesheet" href="./style.css?v=1.8.0">
+<link rel="stylesheet" href="./style.css?v=2.0.0">
+<link rel="stylesheet" href="./cyberpunk.css?v=2.0.0" id="after-hours-theme">
 </head>
 <body>
 <div class="app" id="app">
@@ -39,15 +40,15 @@
     <details class="history"><summary>Round history</summary><div class="log" id="log"></div></details>
     <span id="seedlbl" class="seed-label"></span>
   </aside>
-  <section class="rack" aria-label="Your charms">
-    <h3>Charms <span id="charmcount">0 / 5</span><small>Trigger left → right</small></h3>
+  <section class="rack" aria-label="Your mods">
+    <h3>Mods <span id="charmcount">0 / 5</span><small>Trigger left → right</small></h3>
     <div class="tray" id="charmtray"></div>
   </section>
   <main class="center">
     <div class="board-bezel">
       <div class="board-label"><span id="boardstatus">MAKE YOUR MOVE</span><span>4 × 4</span></div>
       <div class="boardwrap"><div class="board" id="board" aria-label="2048 game board" tabindex="0"><div class="cells" id="cells"></div><div class="tiles" id="tiles"></div></div></div>
-      <div class="board-footer"><span class="led"></span><span id="hint" class="hint">Arrow keys / WASD / swipe</span><span class="housing-mark">A—08</span></div>
+      <div class="board-footer"><span class="led"></span><span id="hint" class="hint">Arrow keys / WASD / swipe</span><span class="housing-mark">A—08 / REV. 87</span></div>
     </div>
     <div class="bankbar" id="bankbar"><span id="bankhint">Merge matching tiles to score.</span><button class="btn" id="btncashnow" style="display:none">Bank round <span id="overlbl"></span><kbd>Space</kbd></button></div>
     <div class="dpad" aria-label="Move tiles"><button data-dir="left" aria-label="Left">←</button><button data-dir="up" aria-label="Up">↑</button><button data-dir="down" aria-label="Down">↓</button><button data-dir="right" aria-label="Right">→</button></div>
@@ -55,35 +56,35 @@
   <aside class="right">
     <section class="draws"><h3>Next draw <span id="pilelbl"></span></h3><div class="nextrow" id="nextrow"></div><details><summary>Your deck <span id="deckcount"></span></summary><div class="deckcomp" id="deckcomp"></div><p class="deckmeta">Draws reshuffle when the deck runs out. Buy packs and use deck upgrades in the shop.</p></details></section>
     <section class="score-tape"><h3>Last move <span>CHIPS × MULT</span></h3><div class="tape" id="calc"><div class="idle">Make a merge to score.</div></div></section>
-    <section class="pocket"><h3>Items <span id="conscount">0 / 3</span></h3><div class="tray" id="constray"></div><p class="deckmeta">Tile edits here affect this board. Use items inside Blueprint or Oddity packs for permanent deck edits.</p></section>
-    <div class="cabinet-sign"><b>DOUBLE UP.</b><b>CASH OUT.</b><span>Eight antes. One way out.</span></div>
+    <section class="pocket"><h3>Items <span id="conscount">0 / 3</span></h3><div class="tray" id="constray"></div><p class="deckmeta">Tile edits here affect this board. Use items inside Blueprint or Blacksite packs for permanent deck edits.</p></section>
+    <div class="cabinet-sign"><b>ANTE INDUSTRIES</b><b>MODEL 2048</b><span>SERVICE VOID IF OPENED</span></div>
   </aside>
-  <footer class="footer"><span>2048: ANTE <small>1.8.0</small></span><button id="btntlog">Run history & export</button><button id="btncredits">Credits</button></footer>
+  <footer class="footer"><span>2048: ANTE / AFTER HOURS <small>2.0.0</small></span><button id="btntlog">Run history & export</button><button id="btncredits">Credits</button></footer>
 </div>
 <div class="ov show" id="ov-start"><div class="modal title-screen">
-  <div class="title-top"><span>A SLIDING TILE ROGUELITE</span><span>8 ANTES / 24 ROUNDS</span></div>
+  <div class="title-top"><span>AFTER HOURS / ARCADE SYSTEMS</span><span>8 ANTES // 24 ROUNDS</span></div>
   <div class="title-art" aria-hidden="true"><span class="title-tile one">8<small>+4 PLUS</small></span><span class="title-tile two">8<small>×2 PRISM</small></span><span class="title-tile three">16<small>DOUBLE UP</small></span></div>
   <div class="title-wordmark"><span>2048:</span><h1>ANTE<span>•</span></h1></div>
-  <p class="title-tagline">Build your deck. Beat the house.</p>
-  <div class="title-actions"><button class="btn" id="btnstart">New run <span>→</span></button><button class="btn ghost" id="btntitlerules">How to play</button></div>
+  <p class="title-tagline">Keep the grid alive.</p>
+  <div class="title-actions"><button class="btn" id="btnstart">Jack in <span>→</span></button><button class="btn ghost" id="btntitlerules">How to play</button></div>
   <details class="seed-option"><summary>Set a seed</summary><label for="seedin">Run seed</label><input id="seedin" placeholder="Leave blank for a random run" maxlength="48" autocomplete="off"><small>The same seed repeats the draws and shop offers.</small></details>
   <div class="meta" id="metastats"></div><div class="title-bottom"><span>ARROWS · WASD · SWIPE</span><button id="btntitlesound">♫ Sound settings</button></div>
 </div></div>
 <div class="ov" id="ov-help"><div class="modal rules-screen">
-  <span class="eyebrow">THE RULES</span><h2>Make every move count.</h2>
+  <span class="eyebrow">ANTE INDUSTRIES / FIELD MANUAL</span><h2>Know your machine.</h2>
   <div class="rules-demo"><span class="mini" data-v="8">8</span><span>+</span><span class="mini" data-v="8">8</span><span>→</span><span class="mini" data-v="16">16</span><b>16 chips × mult</b></div>
   <div class="rules">
     <div><b>01 / Merge & score</b><p>Slide with the arrow keys, WASD, or a swipe. Matching tiles merge once per move. The tiles you make add chips.</p></div>
     <div><b>02 / Build your mult</b><p>Start at 1 mult. Each extra merge in a move adds +2. Consecutive scoring moves build a chain for more mult. A move with no merge breaks it.</p></div>
     <div><b>03 / Beat the target</b><p>You have 24 moves. Reach the target, then bank the round or keep going for up to $10 extra. A locked board costs your overflow bonus. Unused moves do not pay.</p></div>
-    <div><b>04 / Spend between rounds</b><p>Buy charms, items and packs. Every shop stocks two random packs, sometimes Large or Deluxe. Large packs offer more choices; Deluxe packs let you take two. Blueprint packs offer deck work, cash, supplies and run upgrades; rare Oddity packs offer riskier edits. Charms stay for the run. The board resets each round; your deck and upgrades stay. Your deck holds 12–22 tiles. Save cash to earn $1 interest per $5, up to $5.</p></div>
+    <div><b>04 / Spend between rounds</b><p>Buy mods, items, firmware and packs. Every shop stocks two random packs, sometimes Large or Deluxe. Large packs offer more choices; Deluxe packs let you take two. Blueprint packs offer deck work, cash, supplies and run upgrades; rare Blacksite packs offer riskier edits. Mods stay for the run. The board resets each round; your deck and upgrades stay. Your deck holds 12–22 tiles. Save cash to earn $1 interest per $5, up to $5.</p></div>
     <div><b>05 / Clear the rubble</b><p>Rubble blocks a cell. Merge in its row or column to smash it for 25 chips. It falls more often later in the round. Boss walls cannot be cleared.</p></div>
-    <div><b>06 / Upgrade your tiles</b><p>Both tiles’ enhancements activate when they merge; the result keeps one. Each Blueprint or Oddity pack deals 8 tiles from your deck. Its jobs and your held tile tools can edit only that hand; edits stay in your deck. Backing out or taking a second pick does not deal new tiles. During rounds, tile tools affect only the board. Archive sends a board tile into your deck. Clock and Polish can also be used directly in the shop.</p></div>
+    <div><b>06 / Upgrade your tiles</b><p>Both tiles’ enhancements activate when they merge; the result keeps one. Each Blueprint or Blacksite pack deals 8 tiles from your deck. Its jobs and your held tile tools can edit only that hand; edits stay in your deck. Backing out or taking a second pick does not deal new tiles. During rounds, tile tools affect only the board. Archive sends a board tile into your deck. Items that do not target tiles can also be used directly in the shop. Firmware lasts for the run and uses no item slot.</p></div>
     <div><b>07 / Build your board</b><p>Install fixtures on specific cells. Merges landing there can pay chips, mult, cash, or trigger special effects. You have 3 slots; Extension Lead adds a fourth. Find fixtures in Board work or Blueprint packs. Their positions stay between rounds, while charges and uses reset. Wrench moves a fixture without recharging it. Tap a fixture label below the board to see its rule.</p></div>
   </div>
   <h3>Tile enhancements</h3><div class="enhlist" id="enhlist"></div>
   <details class="reaction-guide"><summary>Mixed tile reactions</summary><p>Different finishes can react when they merge. Each pairing fires at most once per move. Both normal effects still fire, and the tile keeps one finish.</p><div class="enhlist"><span><b>Overprint</b>Kick + Plus: +40 chips, +2 mult.</span><span><b>Tempered</b>Prism + Iron: no shatter this merge; keeps Iron.</span><span><b>Shockwave</b>Kick + Iron: break one extra loose rubble for 25 chips.</span><span><b>Scratchcard</b>Brass + Odds: 1 in 4 for an extra $3.</span><span><b>Refraction</b>Prism + Plus: +2 mult per other enhanced tile in its row or column. Max +6.</span><span><b>Wildfire</b>Prism + Odds: 1 in 3 to give an adjacent plain tile Odds.</span></div></details>
-  <p class="rule-note">Charms trigger left to right. Additions build the base mult; × effects multiply it. Odd/even charms refer to powers of two: odd is 2, 8, 32…; even is 4, 16, 64…</p>
+  <p class="rule-note">Mods trigger left to right. Additions build the base mult; × effects multiply it. Odd/even mods refer to powers of two: odd is 2, 8, 32…; even is 4, 16, 64…</p>
   <div class="btnrow"><button class="btn" id="btnhelpclose">Got it</button></div>
 </div></div>
 <div class="ov" id="ov-tlog"><div class="modal">
@@ -110,17 +111,17 @@
 </div></div>
 
 <div class="ov" id="ov-shop"><div class="modal">
-  <div class="shophead"><h2 style="margin:0">Shop</h2><div class="wallet" id="shopwallet">$0</div></div>
+  <div class="shophead"><h2 style="margin:0">Night Market</h2><div class="wallet" id="shopwallet">$0</div></div>
   <p id="shopnext"></p>
   <div class="shopgrid" id="shopgrid"></div>
   <div class="shopsec packs-section"><h3>Packs <span>Two offers · new stock next shop</span></h3><div id="packstock" class="shopgrid pack-stock"></div><p id="shopdeck" class="pack-decknote"></p></div>
-  <div class="shopsec"><h3>Permit <span>Lasts for this run</span></h3><div id="voucherbox"></div></div>
+  <div class="shopsec"><h3>Firmware <span>Lasts for this run</span></h3><div id="voucherbox"></div></div>
   <div class="btnrow">
     <button class="btn ghost" id="btnreroll">Reroll $5</button>
     <button class="btn" id="btnshopnext">Next round</button>
   </div>
-  <div class="shopsec"><h3>Your items <span id="shopconsnote"></span></h3><p class="hand-note">Prepare boosts, move fixtures, or sort your next draws here. Tile tools work on the board or on tiles dealt inside a Blueprint or Oddity pack.</p><div class="item-rack" id="shopcons"></div></div>
-  <div class="shopsec owned"><h3>Your charms <span>◀ ▶ reorder · sell prices below</span></h3><div class="tray" id="shopcharms"></div></div>
+  <div class="shopsec"><h3>Your items <span id="shopconsnote"></span></h3><p class="hand-note">Prepare boosts, move fixtures, or sort your next draws here. Tile tools work on the board or on tiles dealt inside a Blueprint or Blacksite pack.</p><div class="item-rack" id="shopcons"></div></div>
+  <div class="shopsec owned"><h3>Your mods <span>◀ ▶ reorder · sell prices below</span></h3><div class="tray" id="shopcharms"></div></div>
 </div></div>
 
 <div class="ov over" id="ov-pack"><div class="modal pack-modal">
@@ -146,7 +147,7 @@
   <span class="eyebrow">AUDIO</span><h2>Sound settings</h2>
   <label class="setting-row" for="musicvol"><span>Music <output id="musicout">28%</output></span><input id="musicvol" type="range" min="0" max="100" value="28"></label>
   <label class="setting-row" for="sfxvol"><span>Effects <output id="sfxout">65%</output></span><input id="sfxvol" type="range" min="0" max="100" value="65"></label>
-  <label class="setting-row" for="track"><span>On the turntable</span><select id="track"><option value="auto">Shuffle the house set</option><option value="starlight">Starlight Lounge</option><option value="bossa">Bossa Lounger</option><option value="swing">Side Pocket Swing</option><option value="velvet">Velvet Switch</option><option value="wildcard">Wildcard Shuffle</option><option value="headspin">Headspin</option><option value="highlight">House Lights</option><option value="fireside">After Hours</option><option value="blue_mary">Mary Margaret Bounce</option><option value="blue_nitemare">Nitemare</option><option value="blue_not_afraid">Not Afraid</option><option value="blue_flores">Flores Árvores</option></select></label>
+  <label class="setting-row" for="track"><span>Pirate radio</span><select id="track"><option value="auto">Auto · all stations</option><option value="starlight">Starlight Lounge</option><option value="bossa">Bossa Lounger</option><option value="swing">Side Pocket Swing</option><option value="velvet">Velvet Switch</option><option value="wildcard">Wildcard Shuffle</option><option value="headspin">Headspin</option><option value="highlight">House Lights</option><option value="fireside">After Hours</option><option value="blue_mary">Mary Margaret Bounce</option><option value="blue_nitemare">Nitemare</option><option value="blue_not_afraid">Not Afraid</option><option value="blue_flores">Flores Árvores</option></select></label>
   <button class="audio-toggle" id="btnmute">Mute all sound <kbd>M</kbd></button>
   <p class="audio-credit">Music by Sebastian Blue and the house set. Original game sound effects.</p><p id="audiostatus" class="audio-credit" role="status"></p>
   <div class="btnrow"><button class="btn" id="btnsettingsclose">Done</button></div>
@@ -161,5 +162,5 @@
 <div class="ov over" id="ov-backroom"><div class="modal"><span class="eyebrow">EXPERIMENTAL JOBS</span><h2>The backroom</h2><p>One job per shop. Pick your tiles and review the result before paying.</p><div id="backroomgrid" class="backroom-grid"></div><div class="btnrow"><button class="btn ghost" id="btnbackroomclose">Back to shop</button></div></div></div>
 
 <div id="announcer" class="sr-only" role="status" aria-live="polite"></div>
-<script src="./audio.js?v=1.8.0"></script><script src="./juice.js?v=1.8.0"></script><script src="./game.js?v=1.8.0"></script>
+<script src="./audio.js?v=2.0.0"></script><script src="./juice.js?v=2.0.0"></script><script src="./game.js?v=2.0.0"></script>
 </body></html>

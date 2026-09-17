@@ -1,20 +1,20 @@
-# 2048: ANTE
+# 2048: ANTE — After Hours
 
-A sliding-tile roguelite by Sebastian. Build a deck of tiles, combine enhancements, collect charms, and beat eight antes of rising score targets.
+A sliding-tile roguelite by Sebastian. Build a deck of tiles, combine enhancements, collect mods, and beat eight antes of rising score targets.
 
 **Play: https://sebastianblue.github.io/2048/**
 
 ## Playing
 
-Use arrow keys, WASD, swipe, or the direction buttons. A valid slide costs one move. Equal tiles merge once per move; merges score chips, while chains, charms and tile finishes build your multiplier. Reach the target and bank the round, or keep playing for extra cash.
+Use arrow keys, WASD, swipe, or the direction buttons. A valid slide costs one move. Equal tiles merge once per move; merges score chips, while chains, mods and tile finishes build your multiplier. Reach the target and bank the round, or keep playing for extra cash.
 
-Between rounds, buy charms, items, packs and permits. Each shop has exactly two random pack offers in one Packs section. Tile and Blueprint packs share the common pool; Oddity packs are rare. Offers can repeat a type, and neither common type is guaranteed. Shop rerolls do not refresh packs. Blueprint packs contain deck edits, supplies, money and upgrades for the run. Kick, Plus, Prism, Iron, Brass and Odds each have their own blueprint, which applies only that named finish to a chosen tile. Rare Oddity packs contain experimental deck work with tradeoffs. **Opening any pack spends its price permanently.** You can skip its contents, but there are no refunds or replacement offers. Standard packs offer 3 choices and 1 pick; Large packs offer 5 choices and 1 pick; Deluxe packs offer 5 choices and 2 picks. Oddity packs offer up to 4 unique effects. Larger packs cost more. The Print Shop permit adds one extra tile-pack choice and takes $1 off the listed price.
+Between rounds, buy mods, items, packs and firmware. Each shop has exactly two random pack offers in one Packs section. Tile and Blueprint packs share the common pool; Blacksite packs are rare. Offers can repeat a type, and neither common type is guaranteed. Shop rerolls do not refresh packs. Blueprint packs contain deck edits, supplies, money and upgrades for the run. Kick, Plus, Prism, Iron, Brass and Odds each have their own blueprint, which applies only that named finish to a chosen tile. Rare Blacksite packs contain experimental deck work with tradeoffs. **Opening any pack spends its price permanently.** You can skip its contents, but there are no refunds or replacement offers. Standard packs offer 3 choices and 1 pick; Large packs offer 5 choices and 1 pick; Deluxe packs offer 5 choices and 2 picks. Larger packs cost more. The Print Shop firmware adds one extra tile-pack choice and takes $1 off the listed price. Bulk License adds one choice to Blueprint and Blacksite packs; it never adds a pick.
 
-Blueprint and Oddity packs deal a random hand of 8 deck tiles. All jobs and held tile tools use that hand; canceling a selection or making a second Deluxe pick never redraws it. Removed tiles leave the hand, and newly created tiles go into the deck without replacing the missing choices. Held tools do not spend a pack pick. Changes inside a pack are permanent deck edits; using a tile tool during a round changes only the visible board. Archive still files a board tile into the deck.
+Blueprint and Blacksite packs deal a random hand of 8 deck tiles. All jobs and held tile tools use that hand; canceling a selection or making a second Deluxe pick never redraws it. Removed tiles leave the hand, and newly created tiles go into the deck without replacing the missing choices. Held tools do not spend a pack pick. Changes inside a pack are permanent deck edits; using a tile tool during a round changes only the visible board. Archive still files a board tile into the deck.
 
-The shop has a held-item rack and a **Buy & use** option for Clock, Polish, Grease and Hot Wire, even with full item slots. Clock used in the shop saves 6 extra moves for the next round; the other boosts wait for their stated triggers. Wrench moves an installed fixture without restoring its charge, and Stack sends one of the next three draws to the bottom of the pile. Tile tools must be used on the board or on the hand inside an open Blueprint or Oddity pack.
+The shop has a held-item rack and a **Buy & use** option for immediate items: Clock, Polish, Grease, Hot Wire, Read Head, Service Pass, Credit Chip and Scrap Cache. Most work even with full item slots; Scrap Cache needs room for its two tools. Clock used in the shop saves 6 extra moves for the next round (8 with Spare Battery); other boosts wait for their stated triggers. Wrench moves an installed fixture without restoring its charge, and Stack sends one of the next three draws to the bottom of the pile. Deck-editing tools work on the board or the hand inside an open Blueprint or Blacksite pack. Positional tools such as Line Driver and Skip Trace work only on the board.
 
-**Board fixtures** stay on their chosen cells between rounds. Start with three slots; the Extension Lead permit unlocks a fourth. Each shop stocks one fixture separately from its two packs, and Blueprint packs can contain fixture plans. A new installation can replace an old one without a refund. Shop rerolls do not change fixture stock.
+**Board fixtures** stay on their chosen cells between rounds. Start with three slots; the Extension Lead firmware unlocks a fourth. Each shop stocks one fixture separately from its two packs, and Blueprint packs can contain fixture plans. A new installation can replace an old one without a refund. Shop rerolls do not change fixture stock.
 
 | Fixture | Cost | Merge on its cell to… |
 |---|---:|---|
@@ -26,11 +26,19 @@ The shop has a held-item rack and a **Buy & use** option for Clock, Polish, Grea
 | Trapdoor | $10 | Gain ×1.6 mult and remove a result of 16 or more, twice per round. |
 | Switchboard | $7 | Gain +4 mult when the incoming direction differs from its previous hit. |
 
-Fixture charges and direction memory reset each round. Their effects resolve after tile finishes and before charms. Foreman rewards fixture activations; Live Circuit rewards hitting two at once; Field Notes grows when fixtures are installed. Compass, Clean Cut and Surveyor support alternating directions, plain tiles and merges spread across rows and columns. See [the board-workshop notes](reference/board-workshop.md) for tuning and interaction details.
+Fixture charges and direction memory reset each round. Field Service gives limited-use fixtures one extra use; Copper Traces adds 5 chips per real activation. Their effects resolve after tile finishes and before mods. Foreman rewards fixture activations; Live Circuit rewards hitting two at once; Field Notes grows when fixtures are installed. Compass, Clean Cut and Surveyor support alternating directions, plain tiles and merges spread across rows and columns. See [the board-workshop notes](reference/board-workshop.md) for tuning and interaction details.
 
 Higher values can rarely appear in tile packs after you have made that exact value on the board during the current run. Larger numbers stay rarer. Six mixed-finish reactions reward setting up particular pairs; the rules sheet describes each one. Each pairing triggers at most once per move.
 
-The board resets each round; your deck, charms and purchased upgrades remain for the run. Music keeps its place between screens. Sound settings have separate music/effects sliders, a mute button and manual track selection. Reduced-motion settings are respected.
+The board resets each round; your deck, mods and purchased upgrades remain for the run. Music keeps its place between screens. Sound settings have separate music/effects sliders, a mute button and manual track selection. Reduced-motion settings are respected.
+
+## After Hours / v2.0.0
+
+An 80s cyberpunk arcade treatment: steel cabinet, amber scores, circuit-board mod cartridges, a night-market skyline and a matching pack/editor interface. Music and sound scheduling are unchanged.
+
+This release adds **50 cards: ten mods, ten consumables, ten Blueprint effects, ten Blacksite effects and ten firmware upgrades**. The seven fixtures and six tile finishes remain the same. New combinations include lean decks with Minimal ROM, matched draws with Cassette Loop, mixed finishes with Cross Talk, and a single enhanced tile with Null Modem. See [the full 50-card list and costs](reference/after-hours.md).
+
+All additions have source review and syntax checks only. No automated tests or browser playtests were run for this release, at the user's request; tuning remains unplaytested.
 
 ## Local development
 
@@ -43,7 +51,7 @@ npm start
 
 Open http://127.0.0.1:4178/. Use `?qa=1` to keep test-run history and sound preferences separate from your normal browser history.
 
-The game is authored directly in `dist/`; there is no build step and no production dependency. `index.html` loads `game.js` (rules/UI), `audio.js` (music/sound) and `juice.js` (impact/reveal animations). `style.css` and local fonts provide the presentation. Legacy `engine.js`/`app.js` are retained for the earlier version and are not loaded by the current page.
+The game is authored directly in `dist/`; there is no build step and no production dependency. `index.html` loads `game.js` (rules/UI), `audio.js` (music/sound) and `juice.js` (impact/reveal animations). `style.css` provides layout; `cyberpunk.css`, local fonts and the original `assets/after-hours.svg` city illustration provide the After Hours presentation. Legacy `engine.js`/`app.js` are retained for the earlier version and are not loaded by the current page.
 
 ## Publishing
 
